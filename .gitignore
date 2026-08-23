@@ -1,4 +1,5 @@
 local_docs/
+docs/
 .venv/
 __pycache__/
 .claude/

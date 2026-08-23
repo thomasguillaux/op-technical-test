@@ -10,6 +10,7 @@ from diagrams import Cluster, Diagram, Edge
 from diagrams.gcp.analytics import BigQuery, PubSub
 from diagrams.gcp.operations import Logging, Monitoring
 from diagrams.gcp.storage import GCS
+from diagrams.generic.storage import Storage
 from diagrams.onprem.client import Client, Users
 
 GRAPH_ATTR = {
@@ -38,7 +39,8 @@ with Diagram(
         topic = PubSub("events topic\ndurable buffer")
         dlq = PubSub("dead-letter topic")
         bronze = BigQuery(
-            "BRONZE · bronze_events · 90 days\nPARTITION BY DATE(publish_time)\n"
+            "BRONZE · bronze_events · 90 days\n"
+            "PARTITION BY TIMESTAMP_TRUNC(publish_time, HOUR)\n"
             "CLUSTER BY publisher_id, ssp_id, event_type"
         )
         archive = GCS("raw archive\nArchive class · indefinite")
@@ -53,6 +55,11 @@ with Diagram(
             gold_opp = BigQuery("gold_opportunity\ndenominator: auctions")
             gold_ssp = BigQuery("gold_ssp\ndenominator: bids + no_bids")
             quality = BigQuery("quality_day\nis this day complete?")
+
+    with Cluster("Reference data — declared, not built", graph_attr={"style": "dashed"}):
+        refdata = Storage(
+            "ref_fx_rate · ref_revenue_share\nfinance-owned · external tables"
+        )
 
     with Cluster("Semantic layer — BigQuery views"):
         v_opp = BigQuery("v_opportunity\neCPM, fill rate, rpm")
@@ -73,6 +80,8 @@ with Diagram(
 
     bronze >> Edge(label="watermark\nQUALIFY + MERGE") >> silver
     archive >> Edge(label="BigLake replay", style="dashed", color="darkgreen") >> bronze
+
+    refdata >> Edge(style="dashed", color="gray") >> silver
 
     silver >> Edge(label="changed days\n∩ 3-day window") >> gold_opp
     silver >> gold_ssp
