@@ -21,4 +21,4 @@ Built with Claude Code (Opus and Sonnet), driven by Matt Pocock's skills:
 
 ---
 
-Next: [**Business assumptions**](/intro/business-assumptions.md) — what everything else rests on.
+Next: [**Business assumptions**](/intro/02-business-assumptions.md) — what everything else rests on.
