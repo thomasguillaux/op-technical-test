@@ -56,7 +56,7 @@ This is the serious alternative, and its argument is not latency. A stateful str
 
 One surviving leg is enough, because the conclusion is not *"batch is better on balance"* but ***a batch path must exist regardless***. So the continuous design ships two execution models where batch ships one that covers both; its simplicity argument turns around. And the two fail differently: a continuous design that loses its dedup state admits duplicates nothing downstream can detect — **silent wrongness**, against a batch failure that is loud and rerunnable.
 
-**What batch costs**, stated plainly: a watermark, a `MERGE`, a change-detection step and an orchestrator, all four existing only because the work is split into runs. We keep all four. The claim is not that they are free — the alternative keeps them too, and adds ~10 GB of live keyed state on top.
+**What batch costs**, stated plainly: a watermark, a `MERGE`, a change-detection step and an orchestrator, all four existing only because the work is split into runs. We keep all four. The claim is not that they are free — the alternative keeps them too, and adds \~10 GB of live keyed state on top.
 
 ## Rejected — one line each
 

@@ -54,7 +54,7 @@ The usual defence of every layer below raw is *"it is recreatable from raw."* He
 
 This is why data quality is load-bearing here rather than hygiene, and why the checks run hourly. A check that surfaces a problem on day 3 is a repair; the same check running weekly is an obituary.
 
-**Cost.** Bronze storage at a 7-day window is ~$140/month, against ~$1,600 at 90 days — the constraint that removes the safety net pays for most of the layer kept forever. The GCS archive holds 7 days for ~$210/month, and Silver, indefinite and typed wide, is ~$3,000–4,400/month at five years. **Storage went down and compute went up**; presenting only the saving would be dishonest by omission.
+**Cost.** Bronze storage at a 7-day window is \~$140/month, against \~$1,600 at 90 days — the constraint that removes the safety net pays for most of the layer kept forever. The GCS archive holds 7 days for \~$210/month, and Silver, indefinite and typed wide, is \~$3,000–4,400/month at five years. **Storage went down and compute went up**; presenting only the saving would be dishonest by omission.
 
 ## Rejected — one line each
 

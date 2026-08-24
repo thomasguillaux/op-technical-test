@@ -32,27 +32,27 @@ A dropped table, a bad DDL, a corrupting backfill, a mis-scoped IAM grant — ev
 
 | Class | $/GB/month | Minimum duration | Retrieval fee |
 |---|---|---|---|
-| **Standard** | **~$0.020** | **none** | **none** |
-| Nearline | ~$0.010 | 30 days | $0.01/GB |
-| Coldline | ~$0.004 | 90 days | $0.02/GB |
-| Archive | ~$0.0012 | 365 days | $0.05/GB |
+| **Standard** | **\~$0.020** | **none** | **none** |
+| Nearline | \~$0.010 | 30 days | $0.01/GB |
+| Coldline | \~$0.004 | 90 days | $0.02/GB |
+| Archive | \~$0.0012 | 365 days | $0.05/GB |
 
 **Archive is the reflex, and its 365-day minimum duration is why it loses.** The clause is easy to wave away — *"irrelevant, we keep the data anyway"* — and a 7-day window is exactly the case that invalidates that reasoning.
 
-**Deleting at 7 days while being billed for 365 means paying for 365 days of accumulation, forever.** At 1.5 TB/day that is ~547 TB permanently on the invoice for 10.5 TB actually held — **~$657/month on Archive against ~$210 on Standard.** The cheapest per-byte class is the most expensive in practice, by ~3×, and Standard also removes the retrieval fee on the replay the copy exists to serve. *The reusable mechanism: **minimum-duration clauses invert cold-tier economics whenever retention drops below the minimum**.*
+**Deleting at 7 days while being billed for 365 means paying for 365 days of accumulation, forever.** At 1.5 TB/day that is \~547 TB permanently on the invoice for 10.5 TB actually held — **\~$657/month on Archive against \~$210 on Standard.** The cheapest per-byte class is the most expensive in practice, by \~3×, and Standard also removes the retrieval fee on the replay the copy exists to serve. *The reusable mechanism: **minimum-duration clauses invert cold-tier economics whenever retention drops below the minimum**.*
 
-**Cost.** Second export subscription ~$2,100/month plus ~$210 storage — **~$28k/year, flat, with no growth line because the window is fixed.**
+**Cost.** Second export subscription \~$2,100/month plus \~$210 storage — **\~$28k/year, flat, with no growth line because the window is fixed.**
 
 ## BigQuery
 
 Four properties are doing real work:
 
 - **A native Pub/Sub subscription target.** 23k events/second land with no ingestion job of ours. Remove this and something we deploy has to sit in the middle.
-- **Storage and compute priced apart.** Bronze's 7-day window at rest is ~$140/month of storage, not a cluster sized to hold it.
+- **Storage and compute priced apart.** Bronze's 7-day window at rest is \~$140/month of storage, not a cluster sized to hold it.
 - **Cost is bytes scanned, not table size.** That is what makes the partitioning in bullet 2.2 matter, and what makes `maximum_bytes_billed` a real ceiling for the Part 2 agent.
 - **`MERGE` and atomic partition replacement.** Dedup, backfill, and restating money after a reference-data correction are all SQL statements — one code path covers steady state and every repair.
 
-**One cost lever, one setting: physical storage billing.** It costs 2× per byte and wins past 2:1 compression, which event JSON clears easily. **Where it earns its keep is Silver, not Bronze:** Bronze takes the setting too, but a 7-day window makes it a ~$140 table, while Silver grows without bound — roughly $3,500/month against $7,000 at five years.
+**One cost lever, one setting: physical storage billing.** It costs 2× per byte and wins past 2:1 compression, which event JSON clears easily. **Where it earns its keep is Silver, not Bronze:** Bronze takes the setting too, but a 7-day window makes it a \~$140 table, while Silver grows without bound — roughly $3,500/month against $7,000 at five years.
 
 ## Dataflow / Beam — rejected
 
@@ -126,7 +126,7 @@ Dataflow, Composer and dbt Core all lost to the same sentence: **a runtime we op
 | **Composer / Airflow** | Right for a mixed DAG; this one has a single system in it. Kept as a future option: Dataform's API lets us add it later |
 | **dbt Core** | Its main argument is portability, and the stack is required to be single-warehouse. What remains is a Python runtime we patch, to submit SQL that BigQuery runs anyway |
 | **BigQuery scheduled queries** | No dependency graph, and SQL living only in a console object contradicts the core of this design |
-| **Archive or Nearline on the raw copy** | ~3× and ~2× more expensive at a 7-day window because of their minimum-duration clauses, plus a retrieval fee on the replay the copy exists to serve |
+| **Archive or Nearline on the raw copy** | \~3× and \~2× more expensive at a 7-day window because of their minimum-duration clauses, plus a retrieval fee on the replay the copy exists to serve |
 | **Indefinite retention on the archive** | Unlawful under the stated rule rather than merely expensive — the ceiling binds the record wherever it sits. Silver carries the durability instead |
 | **Pub/Sub retention alone, no GCS copy** | The genuine cheaper alternative. Rejected on inspectability — a replay is a re-ingest, so you cannot look at it without spending it |
 | **Scheduled export from Bronze to GCS** | \~$25k/year cheaper, and it routes the safety copy through the system it exists to survive |
