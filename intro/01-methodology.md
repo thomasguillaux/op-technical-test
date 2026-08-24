@@ -11,11 +11,13 @@ Drawing the five boxes named in the test and connecting them gives an architectu
 
 ## How it was built
 
-Built with Claude Code (Opus and Sonnet), driven by Matt Pocock's skills:
+Built with Claude Code (Opus and Sonnet), driven by [Matt Pocock's skills](https://github.com/mattpocock/skills):
 
 - **`wayfinder`** — map the whole scope as decisions before making any of them.
 - **`grill-with-docs`** — attack each decision, then record it with the argument that survived.
 - **`domain-modeling`** — keep the vocabulary honest as it moves.
+
+Plus a few from [superpowers](https://github.com/obra/superpowers).
 
 **The model's job was to argue; mine was to decide.** Several choices here went against its recommendation.
 
