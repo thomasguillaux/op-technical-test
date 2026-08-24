@@ -162,6 +162,18 @@ The cadence is set by *self-healing*, not by freshness: a failed run is repaired
 
 **Cost.** The hourly rebuild is \~$450/month, against \~$113 at four-hourly and \~$900 at 30 minutes. Thirty minutes buys nothing: an hourly figure cannot exist before its hour ends.
 
+### No dimension tables
+
+The star-schema reflex is one table per entity, joined by key. Here every dimension — `publisher_id`, `ad_unit_id`, `ssp_id`, `format`, `device`, `channel` — is a column on the fact row.
+
+**Normalisation exists to stop repeating a string on disk, and a columnar store already does that.** `device` with four values dictionary-encodes to almost nothing, so the storage a dimension table saves is storage BigQuery was never going to spend. What it costs instead is a join on every query, for every consumer — including a copilot composing its own SQL, where a wrong join is a wrong number rather than an error.
+
+The one attribute that genuinely varies over time is the publisher's revenue share, and it is already versioned: a declared external table with `valid_from` and `valid_to`, applied in Silver before Gold sees the row. **The history a slowly-changing dimension exists to keep is kept one layer earlier, where the money is computed.**
+
+A human-readable publisher name is the honest use for a small lookup. Nothing asks for one — BI and the copilot both filter on `publisher_id` — and if one is wanted it joins in the semantic view: a display label, not a change to the fact grain.
+
+*What brings dimension tables back:* an attribute with its own history that cannot be resolved in Silver, or a dimension large enough that repeating it costs.
+
 ## `quality_hour` — a third table, beside the two fact tables
 
 It records whether each hour is complete and trustworthy, and lives in Gold so Part 2's copilot can check it with the access it already has.
@@ -202,6 +214,7 @@ It holds no count of null `publisher_payout`: that one is an assertion, which *f
 | Option | Why not |
 |---|---|
 | **A single Gold fact table at SSP grain** | Cannot express `auctions`; forces either a 10-20× opportunity overcount or a placeholder row every query must remember |
+| **Dimension tables / a star schema in Gold** | Saves bytes a columnar store already saves, and buys a join every consumer can get wrong — the copilot included. The one time-varying attribute is versioned in Silver before Gold sees it |
 | **Flow attribution — each event in its own hour** | Splits an auction across two buckets, breaking every ratio in both. Its defence fails exactly at a deploy, which is what the hourly tier is for |
 | **A self-join on `auction_id` to find the auction hour** | Correct, and a three-day shuffle on every hourly run. Denormalising `auction_timestamp` makes it a column read |
 | **Holding unsettled hours back from publication** | Throws away real data to hide incompleteness. `is_settled` labels it instead |

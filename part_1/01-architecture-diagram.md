@@ -8,6 +8,8 @@ What the pipeline must absorb: 2B events/day — \~23,000/second sustained, \~1.
 
 Six GCP services — Pub/Sub, Cloud Storage, BigQuery, Dataform, Cloud Logging, Cloud Monitoring — in two shapes. Left of Bronze, Google-operated configuration: one topic, two native export subscriptions, a dead-letter topic. Right of Bronze, SQL on a clock. **There is no third shape: no service we deploy, no runtime we patch, nothing of ours that can fail between publisher and dashboard.**
 
+**The reference architecture for this on GCP puts Dataflow between the topic and the warehouse. That box is absent here, and its absence is the design** — the only work it would do is a field split the producer already performs, and putting it back would place a runtime we operate on the one path where a failure loses data rather than delays it. Argued in full in bullet 1.2, including the condition that brings it back.
+
 ## The path, hop by hop
 
 | # | Hop | Mechanism | Latency |
