@@ -68,6 +68,23 @@ Daily and dimensioned, not daily totals: the copilot's *"why"* breakdown is only
 
 The obvious design is a single table at `day × publisher × ad_unit × ssp × format × device × channel`. **That grain cannot hold `auctions`**, and `auctions` is the denominator of fill rate. An auction carries no `ssp_id`. It does know *which* SSPs were invited, but that is an **array, not a single value**. Using it splits one auction into N rows and multiplies the opportunity count by the number of SSPs invited, 10-20×.
 
+```mermaid
+flowchart LR
+  subgraph rej["Rejected — one fact table at SSP grain"]
+    direction LR
+    A1["1 auction<br/>10 SSPs invited"] --> R1["10 rows<br/>auctions counted 10x"]
+  end
+  subgraph ch["Chosen — two fact tables"]
+    direction LR
+    A2["1 auction<br/>10 SSPs invited"] --> O["gold_opportunity — 1 row<br/>denominator: auctions"]
+    A2 --> S["gold_ssp — 10 rows<br/>denominator: bids + no_bids"]
+  end
+  classDef bad fill:none,stroke:#c0504d,stroke-width:2px;
+  classDef ok fill:none,stroke:#2e8b57,stroke-width:2px;
+  class R1 bad;
+  class O,S ok;
+```
+
 **`gold_opportunity`** — `day × publisher_id × ad_unit_id × format × device × channel`
 `auctions` · `auctions_with_bid` · `responses` · `bids` · `wins` · `impressions` · `gross_revenue` · `publisher_payout`
 

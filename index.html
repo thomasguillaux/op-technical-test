@@ -111,6 +111,14 @@
     .markdown-section pre[data-lang] .token.punctuation { color: var(--tok-punct); background: transparent; }
     .markdown-section pre[data-lang] .token.comment  { color: var(--tok-comment); font-style: italic; }
 
+    /* ---------- mermaid ---------- */
+    .markdown-section .mermaid {
+      margin: 1.6em 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+    .markdown-section .mermaid svg { max-width: 100%; height: auto; }
+
     /* ---------- theme switch ---------- */
     #theme-switch {
       position: fixed;
@@ -155,9 +163,49 @@
           dark = document.documentElement.getAttribute('data-theme') !== 'dark';
           apply(dark);
           try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
+          renderMermaid();
         });
       });
     })();
+
+    /* ---------- mermaid: render from source, re-render on theme change ---------- */
+    function renderMermaid() {
+      var nodes = document.querySelectorAll('.markdown-section .mermaid');
+      if (!nodes.length || !window.mermaid) return;
+
+      var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      var css = getComputedStyle(document.documentElement);
+      var v = function (n) { return css.getPropertyValue(n).trim(); };
+
+      window.mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        theme: 'base',
+        fontFamily: 'inherit',
+        themeVariables: {
+          background:           v('--page-bg'),
+          primaryColor:         v('--inline-bg'),
+          primaryTextColor:     v('--page-fg'),
+          primaryBorderColor:   dark ? '#3b4552' : '#cbd5e1',
+          secondaryColor:       v('--table-alt'),
+          tertiaryColor:        v('--table-alt'),
+          lineColor:            v('--tok-punct'),
+          textColor:            v('--page-fg'),
+          mainBkg:              v('--inline-bg'),
+          nodeBorder:           dark ? '#3b4552' : '#cbd5e1',
+          clusterBkg:           v('--table-alt'),
+          clusterBorder:        v('--border'),
+          edgeLabelBackground:  v('--page-bg'),
+          titleColor:           v('--heading-fg')
+        }
+      });
+
+      nodes.forEach(function (n) {
+        n.removeAttribute('data-processed');
+        n.innerHTML = decodeURIComponent(n.getAttribute('data-graph'));
+      });
+      window.mermaid.run({ nodes: nodes });
+    }
 
     window.$docsify = {
       name: 'Technical Test',
@@ -166,9 +214,25 @@
       auto2top: true,
       alias: {
         '/.*/_sidebar.md': '/_sidebar.md'
-      }
+      },
+      markdown: {
+        renderer: {
+          code: function (code, lang) {
+            if (lang === 'mermaid') {
+              return '<div class="mermaid" data-graph="' + encodeURIComponent(code) + '"></div>';
+            }
+            return this.origin.code.apply(this, arguments);
+          }
+        }
+      },
+      plugins: [
+        function (hook) {
+          hook.doneEach(function () { renderMermaid(); });
+        }
+      ]
     }
   </script>
+  <script src="//cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/docsify/lib/docsify.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
 </body>

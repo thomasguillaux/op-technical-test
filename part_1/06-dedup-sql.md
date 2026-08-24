@@ -116,6 +116,23 @@ WHEN NOT MATCHED THEN INSERT ROW;
 2. The producer retries X and re-stamps `event_timestamp` into D5. `batch_days = [D5]`
 3. The `ON` clause looks for X **in D5 only**, finds nothing, and `WHEN NOT MATCHED` inserts it
 
+```mermaid
+flowchart TB
+  R["Retry of event_id X,<br/>event_timestamp re-stamped into D5"]
+  D4["D4 — holds the original X<br/>outside the search window"]
+  subgraph win["ON clause: t.event_day IN (D5)"]
+    D5["D5"]
+  end
+  R --> D5
+  D5 --> RES["No match — WHEN NOT MATCHED inserts<br/>two rows, one event_id"]
+  D4 -. "never examined" .-> RES
+  RES --> Q["quality_day, next morning:<br/>event_ids seen with more than one event_timestamp"]
+  classDef out fill:none,stroke:#c0504d,stroke-width:2px;
+  classDef det fill:none,stroke:#2e8b57,stroke-width:2px;
+  class D4,RES out;
+  class Q det;
+```
+
 Two rows, one `event_id`. The `UPDATE SET` exclusion above never applies, because the row was never matched.
 
 **Closing this inside the `MERGE` means dropping the partition filter and matching against 13 months of Silver on every 30-minute run.** That is the exact cost bullet 2.2 works to avoid, paid 48 times a day, to protect against a producer bug that should not exist.
