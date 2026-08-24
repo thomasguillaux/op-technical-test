@@ -26,6 +26,26 @@ What the pipeline must absorb: **2B events/day — \~23,000/second sustained, \~
 
 **1. Two writes from one topic, not one write and a copy.** Bronze and the archive are siblings: the topic feeds both directly. A scheduled export from Bronze to GCS would save \~$25k/year, but it would place the safety copy *downstream* of the system it protects us from. A corrupted write into Bronze would be copied into the archive. Paying the export fee twice is what buys two independent failure domains.
 
+```mermaid
+flowchart LR
+  subgraph rejected["Rejected — scheduled export, ~$25k/year cheaper"]
+    direction LR
+    T2(["events topic"]) --> B2["Bronze"]
+    B2 -- "corruption is copied" --> G2["GCS archive"]
+  end
+  subgraph chosen["Chosen — two subscriptions"]
+    direction LR
+    T1(["events topic"]) --> B1["Bronze"]
+    T1 --> G1["GCS archive"]
+  end
+  classDef ok fill:none,stroke:#2e8b57,stroke-width:2px;
+  classDef bad fill:none,stroke:#c0504d,stroke-width:2px;
+  class G1 ok;
+  class B2,G2 bad;
+```
+
+Two arrows out of the topic means two failure domains. One arrow through Bronze means one.
+
 **2. Ingestion holds no state of ours.** No dedup, no join, no aggregation, no validation before Bronze. Everything that can be wrong sits after it, where the repair is a rerun of the same SQL.
 
 **3. One box on the left is not configuration: we had to build it.** Dataform logs every workflow invocation but sends no notification of its own. So Cloud Logging → a log-based alert in Cloud Monitoring → the team's channel is a real box on the diagram, not decoration.

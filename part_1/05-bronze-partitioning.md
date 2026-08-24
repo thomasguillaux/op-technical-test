@@ -44,6 +44,30 @@ There is a second, stronger reason: **`event_timestamp` is not a Bronze column a
 
 An hourly partition is \~62 GB logical. A 30-minute run touches one or two: \~124 GB, \~6 TB/day, **\~$1,000/month.** Same SQL, one DDL line.
 
+```mermaid
+flowchart LR
+  W["Silver run, every 30 min<br/>WHERE publish_time > watermark"]
+  subgraph day["Daily grain — 1 partition"]
+    DB["every block sorted by publisher_id, ssp_id, event_type<br/>publish_time spread across all of them"]
+  end
+  subgraph hour["Hourly grain — 24 partitions/day"]
+    H1["hour n-1<br/>~62 GB"]
+    H2["hour n<br/>~62 GB"]
+  end
+  W --> DB
+  W --> H1
+  W --> H2
+  DB --> C1["scans the whole day so far<br/>~750 GB/run · ~$6,100/month"]
+  H1 --> C2["~124 GB/run · ~$1,000/month"]
+  H2 --> C2
+  classDef bad fill:none,stroke:#c0504d,stroke-width:2px;
+  classDef ok fill:none,stroke:#2e8b57,stroke-width:2px;
+  class DB,C1 bad;
+  class C2 ok;
+```
+
+Pruning is what the partition grain buys; block pruning is what the clustering spends.
+
 **The limit is far away.** 90 days × 24 = **2,160 partitions**, against BigQuery's limit of 10,000: 4.6× margin. It would only bind past \~416 days of retention, which Bronze will never reach, because Bronze is a reprocessing window and GCS holds the indefinite copy. A separate limit caps a single job at **4,000 partitions modified**; a 90-day replay in one statement touches 2,160, and the replay runbook works day by day (24 partitions) anyway.
 
 **The real cost is for the humans writing queries:** they must filter on a timestamp range instead of `DATE(publish_time) = …`, or pruning will not fire reliably. For a layer whose queries are arrival ranges by nature, as the next section shows, that is the natural shape anyway.
