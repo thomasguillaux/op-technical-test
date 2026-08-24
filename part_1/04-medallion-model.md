@@ -108,7 +108,39 @@ Every invited SSP produces exactly one response, so `bids + no_bids` is the coun
 
 **The build rule:** every 4 hours, rebuild each day inside a trailing **3-day window** whose Silver rows changed. Frequency and window are two different levers: the frequency buys recovery *speed*, the window buys recovery *reach*. Three days matches the worst realistic detection delay: a Friday failure found on Monday sits at exactly D-3.
 
-**A third table sits beside the two fact tables: `quality_day`, which records whether each day is complete** — hourly counts and lateness from the daily quality job. It lives in Gold so Part 2's copilot can check whether a day is trustworthy with the access it already has, and needs no exception into Silver.
+## `quality_day` — a third table, beside the two fact tables
+
+**It records whether each day is complete.** It lives in Gold so Part 2's copilot can check whether a day is trustworthy with the access it already has, and needs no exception into Silver.
+
+```sql
+CREATE TABLE gold.quality_day (
+  day                   DATE,           -- the event day being judged
+  publisher_id          STRING,
+  events                INT64,          -- Silver rows for that day and publisher
+  events_by_hour        ARRAY<INT64>,   -- 24 entries, by HOUR(event_timestamp)
+  rejects               INT64,          -- rows diverted to silver_rejects
+  lateness_p99_seconds  INT64,          -- p99 of ingestion_timestamp − event_timestamp
+  late_beyond_1h        INT64,          -- events exceeding the assumed arrival bound
+  restamped_event_ids   INT64,          -- event_ids seen with more than one event_timestamp
+  is_complete           BOOL,           -- all 24 hours non-zero and rejects ÷ events under threshold
+  computed_at           TIMESTAMP
+)
+PARTITION BY day
+CLUSTER BY publisher_id;
+```
+
+**Grain is `day × publisher_id`, not `day`.** *Which* publisher is late, or re-stamping, is the entire actionable content; a daily total names nobody. \~300 rows/day.
+
+| Column | The argument that needs it |
+|---|---|
+| `events_by_hour` | Completeness. A missing hour is invisible in a daily total |
+| `lateness_p99_seconds` | Bullet 2.2's one-hour arrival bound is *measured*, not assumed: the arrival range widens by exactly this |
+| `late_beyond_1h` | The count of events that broke that bound, per publisher |
+| `restamped_event_ids` | Zero in steady state. Non-zero is the only way to reach bullet 2.3's day-scoped dedup limit |
+| `rejects` | The numerator of the Silver rejects-rate alert |
+| `is_complete` | One boolean, so the copilot needs no interpretation. The rule lives in the SQLX, not in each consumer |
+
+Three arguments elsewhere in Part 1 end at this table, so it is a deliverable rather than an aside. It holds **no** count of null `publisher_payout`: that one is a Dataform assertion, which *fails the build* instead of recording a number.
 
 ## Rejected — one line each
 
