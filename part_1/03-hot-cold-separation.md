@@ -2,6 +2,8 @@
 
 *Test bullet: explain how you separate real-time processing (hot path) from batch archiving and re-processing (cold path).*
 
+The test's phrase is *real-time processing*. The answer here is that there is none of ours: the hot path receives and buffers, and every processing step — dedup, typing, joins, aggregation — sits on the cold side of the line.
+
 The line sits at Bronze, for one reason: **nothing that can be wrong happens before it.**
 
 |                     | Hot path                                                 | Cold path                                                       |
