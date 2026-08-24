@@ -124,9 +124,10 @@ CREATE TABLE gold.quality_day (
   is_complete           BOOL,           -- all 24 hours non-zero and rejects ÷ events under threshold
   computed_at           TIMESTAMP
 )
-PARTITION BY day
-CLUSTER BY publisher_id;
+PARTITION BY day;
 ```
+
+No `CLUSTER BY`. \~300 rows/day, the whole table stays tiny for years — nothing here is big enough for block pruning to matter.
 
 **Grain is `day × publisher_id`, not `day`.** *Which* publisher is late, or re-stamping, is the entire actionable content; a daily total names nobody. \~300 rows/day.
 
