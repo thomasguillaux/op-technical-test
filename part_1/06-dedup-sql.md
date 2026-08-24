@@ -1,4 +1,6 @@
-# 2.3 — Write the SQL query (using a window function) to deduplicate events arriving with the same `event_id` during the Bronze → Silver transition
+# 2.3 — Dedup that survives reruns
+
+*Test bullet: write the SQL query (using a window function) to deduplicate events arriving with the same `event_id` during the Bronze → Silver transition.*
 
 The window function, as asked. Six lines:
 
@@ -12,19 +14,19 @@ QUALIFY ROW_NUMBER() OVER (
         ) = 1
 ```
 
-`QUALIFY` filters on a window function without the `SELECT ... FROM (…) WHERE rn = 1` wrapper. Same semantics, one less nesting level.
+`QUALIFY` filters on a window function without the `SELECT ... FROM (…) WHERE rn = 1` wrapper. Same result, one level of nesting less.
 
-`ORDER BY publish_time DESC` keeps the **last** copy. Either choice is defensible; keeping the last makes the tie-break identical to the one the `MERGE` below applies against rows already in Silver, so the rule is stated once and holds everywhere.
+`ORDER BY publish_time DESC` keeps the **last** copy. Both choices are defensible. Keeping the last one makes this tie-break identical to the one the `MERGE` below applies against rows already in Silver, so the rule is written once and holds everywhere.
 
-**`publish_time` is the column name Pub/Sub fixes on Bronze; Silver renames it to `ingestion_timestamp` once, here.** The filter has to name `publish_time` rather than the alias — it is the partitioning column, and `require_partition_filter` is watching.
+**`publish_time` is the column name Pub/Sub imposes on Bronze. Silver renames it to `ingestion_timestamp` once, here.** The filter must name `publish_time`, not the alias: it is the partitioning column, and `require_partition_filter` is watching.
 
-## On its own this is a batch-local dedup — which is a different and wrong thing
+## Alone, it dedups only the batch
 
-**Duplicates arrive up to an hour late, and Silver runs every 30 minutes. A duplicate and its original usually land in *different runs*.** That hour is *measured* — the daily quality job counts events exceeding it per publisher — not assumed. The window function only sees one batch, so in the common case it sees one copy, finds nothing to remove, and inserts a row Silver already holds. Silver double-counts, Gold sums it, and the number a dashboard shows is quietly wrong.
+**Duplicates arrive up to an hour late, and Silver runs every 30 minutes. A duplicate and its original usually land in *different runs*.** That hour is *measured*, not assumed: the daily quality job counts the events that exceed it, per publisher. The window function sees one batch only. So in the common case it sees one copy, finds nothing to remove, and inserts a row Silver already holds. Silver counts twice, Gold sums it, and the number on the dashboard is quietly wrong.
 
 Removing duplicates **against what is already in Silver** takes a `MERGE ON event_id`.
 
-That does not make the window function optional. **BigQuery rejects a `MERGE` whose source contains duplicate keys** — `UPDATE/MERGE must match at most one source row for each target row`. The two are not alternatives:
+That does not make the window function optional. **BigQuery rejects a `MERGE` whose source contains duplicate keys:** `UPDATE/MERGE must match at most one source row for each target row`. The two are not alternatives:
 
 - the window function makes the `MERGE` **legal**,
 - the `MERGE` makes the dedup **correct**.
@@ -96,60 +98,60 @@ WHEN MATCHED AND s.ingestion_timestamp > t.ingestion_timestamp THEN UPDATE SET
 WHEN NOT MATCHED THEN INSERT ROW;
 ```
 
-## Four choices in it worth pointing at
+## Four choices worth pointing at
 
-**`t.event_day IN UNNEST(batch_days)` sits in the `ON` clause, not in a subquery.** That line *is* the partition pruning. Buried anywhere BigQuery cannot evaluate before the scan, pruning silently stops — the results stay correct and only the bill changes. Without it, every run matches against 13 months of Silver.
+**`t.event_day IN UNNEST(batch_days)` sits in the `ON` clause, not in a subquery.** That line *is* the partition pruning. Put it anywhere BigQuery cannot evaluate before the scan and pruning stops silently: the results stay correct, only the bill changes. Without it, every run matches against 13 months of Silver.
 
-**`batch_days` is read from the data, not assumed to be "today and yesterday".** A three-day-old backfill targets its own partition automatically. A hardcoded window would scan the wrong partitions *and* miss the duplicates it was meant to catch.
+**`batch_days` is read from the data, not assumed to be "today and yesterday".** A backfill three days old targets its own partition automatically. A hardcoded window would scan the wrong partitions *and* miss the duplicates it was meant to catch.
 
-**`event_day` is deliberately absent from the `UPDATE SET`.** A duplicate whose event day moved is not a duplicate — it is the producer re-stamping timestamps on retry while reusing `event_id`. Updating the column would move the row across partitions and hide a producer bug, so it stays out and the anomaly is left visible to the quality job instead. What that costs is the next section.
+**`event_day` is absent from the `UPDATE SET` on purpose.** A duplicate whose event day moved is not a duplicate: the producer re-stamped the timestamps on retry while reusing `event_id`. Updating the column would move the row to another partition and hide a producer bug. So it stays out, and the anomaly stays visible to the quality job. The next section gives the price of that choice.
 
-**`SAFE_CAST` plus `WHERE y.event_timestamp IS NOT NULL` is the rejects boundary.** A companion `INSERT` writes the excluded rows with their raw payload to `silver_rejects`. One publisher sending malformed timestamps must not stop Silver for everyone — and `SAFE_CAST` is what keeps a bad value from failing the statement rather than the row.
+**`SAFE_CAST` plus `WHERE y.event_timestamp IS NOT NULL` is the rejects boundary.** A second `INSERT` writes the excluded rows, with their raw payload, to `silver_rejects`. One publisher sending malformed timestamps must not stop Silver for everyone, and `SAFE_CAST` is what makes a bad value fail the row instead of the statement.
 
-## What the partition filter costs: dedup is day-scoped, and that is a trade, not an oversight
+## Day-scoped dedup is a trade, not an oversight
 
-`t.event_day IN UNNEST(batch_days)` is what makes the `MERGE` cheap. It is also what bounds it. Trace the one case where the bound bites:
+`t.event_day IN UNNEST(batch_days)` is what makes the `MERGE` cheap. It is also what limits it. Here is the one case where that limit shows:
 
 1. Silver holds `event_id = X` at `event_day = D4`
 2. The producer retries X and re-stamps `event_timestamp` into D5. `batch_days = [D5]`
-3. The `ON` clause looks for X **only in D5**, finds nothing — and `WHEN NOT MATCHED` inserts
+3. The `ON` clause looks for X **in D5 only**, finds nothing, and `WHEN NOT MATCHED` inserts it
 
-Two rows, one `event_id`. The `UPDATE SET` exclusion above never fires, because the row was never matched.
+Two rows, one `event_id`. The `UPDATE SET` exclusion above never applies, because the row was never matched.
 
-**Closing it inside the `MERGE` means dropping the partition filter and matching against 13 months of Silver on every 30-minute run** — the exact cost this design spends bullet 2.2 avoiding, paid 48 times a day, to defend against a producer bug that should not exist.
+**Closing this inside the `MERGE` means dropping the partition filter and matching against 13 months of Silver on every 30-minute run.** That is the exact cost bullet 2.2 works to avoid, paid 48 times a day, to protect against a producer bug that should not exist.
 
-So it is closed by **detection instead of prevention**: the daily quality job counts `event_id`s appearing with more than one `event_timestamp`. Zero in steady state — non-zero means a producer is re-stamping, which is the only way this bound is ever reached. It surfaces as a number on `quality_day` the next morning, and the repair is a targeted rebuild of the two days involved. **The rule the whole design runs on is that being wrong must be visible and rerunnable, not impossible** — and a bound you have priced and instrumented is a different thing from one you did not notice.
+So it is closed by **detection instead of prevention**: the daily quality job counts the `event_id`s that appear with more than one `event_timestamp`. Zero in steady state. Non-zero means a producer is re-stamping, which is the only way to reach this limit. It appears as a number on `quality_day` the next morning, and the repair is a targeted rebuild of the two days involved. **The rule the whole design runs on: being wrong must be visible and rerunnable, not impossible.** A limit we have priced and instrumented is not the same as one we did not notice.
 
-## The read boundary is a watermark, not a fixed window
+## A watermark, not a fixed window
 
-`WHERE publish_time > watermark` — every Bronze row ingested since the last **successful** run.
+`WHERE publish_time > watermark` reads every Bronze row ingested since the last **successful** run.
 
-A fixed lookback (say 3 hours) has no catch-up mode: a backlog draining on Sunday arrives outside every subsequent window, is skipped permanently, and Gold then rebuilds Friday from a Silver that already dropped the repair.
+A fixed lookback, say 3 hours, has no catch-up mode. A backlog that drains on Sunday arrives outside every following window and is skipped for good, and Gold then rebuilds Friday from a Silver that already lost those rows.
 
-This is safe **because `publish_time` is our clock.** Pub/Sub stamps it, so the watermark is monotonic and nothing can arrive behind it. A watermark on the producer-supplied `event_timestamp` would let one skewed client land rows below the mark, invisible forever.
+This is safe **because `publish_time` is our clock.** Pub/Sub stamps it, so the watermark only moves forward and nothing can arrive behind it. A watermark on the producer's `event_timestamp` would let one skewed client write rows below the mark, invisible forever.
 
-It also states the rule more simply: *process everything not yet processed*. A two-day backlog runs the same code as a two-minute one — which is the same one-code-path property the whole cold path rests on.
+It also states the rule more simply: *process everything not yet processed*. A two-day backlog runs the same code as a two-minute one, which is the single-code-path property the whole cold path rests on.
 
-**One consequence, because it touches a metric:** `ingestion_timestamp` in Silver means *when the copy we kept arrived*, not when the event first reached us. Lateness figures are therefore last-arrival lateness — a superset that over-reports and never under-reports. Bronze holds every copy for 90 days if a true first-arrival measurement is ever wanted.
+**One consequence, because it affects a metric:** `ingestion_timestamp` in Silver means *when the copy we kept arrived*, not when the event first reached us. So lateness figures measure the last arrival: they over-report, never under-report. Bronze holds every copy for 90 days if we ever want a true first-arrival measurement.
 
 ## Midnight is a non-issue
 
-The natural probe: an event at 23:59:59 whose duplicate arrives after midnight — do they land in different partitions and escape each other?
+The obvious question: an event at 23:59:59 whose duplicate arrives after midnight. Do they land in different partitions and miss each other?
 
-No. `event_day` derives from `event_timestamp`, which travels with the event, so both copies carry the same day regardless of arrival time. A batch spanning midnight simply produces two entries in `batch_days` and targets both partitions.
+No. `event_day` comes from `event_timestamp`, which travels with the event, so both copies carry the same day whatever their arrival time. A batch that spans midnight simply produces two entries in `batch_days` and targets both partitions.
 
 ## Rejected — one line each
 
 | Option | Why not |
 |---|---|
-| **Window function alone** | Batch-local. The duplicate usually arrives in a later run than the original, so it removes nothing in the common case |
-| **`MERGE` alone, no window function** | Illegal: BigQuery refuses a source with duplicate keys — `UPDATE/MERGE must match at most one source row for each target row` |
+| **Window function alone** | Limited to one batch. The duplicate usually arrives in a later run than the original, so in the common case it removes nothing |
+| **`MERGE` alone, no window function** | Illegal: BigQuery refuses a source with duplicate keys, `UPDATE/MERGE must match at most one source row for each target row` |
 | **`SELECT DISTINCT` / `GROUP BY event_id`** | No tie-break rule, and no way to express "keep the later copy" |
-| **`ORDER BY publish_time ASC` (keep first)** | Defensible, but then the batch rule and the `MERGE` rule disagree, and the disagreement only shows up on a row that arrived twice |
-| **Dedup at ingest, before Bronze** | Needs ~10 GB of live keyed state on the hot path to hold a 1h window at 23k/s — and loses duplicates *silently* when that state is lost, where the `MERGE` fails loudly and reruns |
-| **A fixed 3h read window** | No catch-up: a draining backlog is skipped permanently, and only the numbers show it |
-| **Partition filter in a subquery instead of the `ON` clause** | Same results, no pruning — the failure is invisible except on the bill |
-| **Dropping the partition filter to make dedup day-independent** | 13 months of Silver matched on every 30-minute run, to prevent a producer bug that `quality_day` already surfaces the next morning |
+| **`ORDER BY publish_time ASC` (keep first)** | Defensible, but then the batch rule and the `MERGE` rule disagree, and that disagreement only shows on a row that arrived twice |
+| **Dedup at ingest, before Bronze** | Needs \~10 GB of live keyed state on the hot path to hold a 1h window at 23k/s, and lets duplicates through *silently* when that state is lost, where the `MERGE` fails loudly and can be rerun |
+| **A fixed 3h read window** | No catch-up: a draining backlog is skipped for good, and only the numbers show it |
+| **Partition filter in a subquery instead of the `ON` clause** | Same results, no pruning: the failure is invisible except on the bill |
+| **Dropping the partition filter to make dedup day-independent** | 13 months of Silver matched on every 30-minute run, to prevent a producer bug that `quality_day` already reports the next morning |
 | **`CAST` instead of `SAFE_CAST`** | One malformed value fails the whole run instead of one row |
 
 ---

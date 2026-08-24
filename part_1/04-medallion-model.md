@@ -1,30 +1,32 @@
-# 2.1 — Propose a data organization according to the Medallion pattern (Bronze, Silver, Gold)
+# 2.1 — Three layers, three contracts
 
-Each layer enforces exactly one rule, and the rule is what decides what may not happen there.
+*Test bullet: propose a data organization according to the Medallion pattern (Bronze, Silver, Gold).*
+
+Each layer enforces exactly one rule, and that rule decides what may not happen there.
 
 | | **Bronze** | **Silver** | **Gold** |
 |---|---|---|---|
-| **Rule** | Accepts everything, validates nothing | Types, deduplicates, applies anything that can later change | Aggregates to the grain the business asks questions at |
+| **Rule** | Accepts everything, validates nothing | Types, deduplicates, applies anything that can later change | Aggregates to the grain the business uses for its questions |
 | **Grain** | One row per message | One row per event, deduplicated on `event_id` | One row per day × dimensions |
 | **Shape** | Typed envelope + opaque `payload` JSON | 16 typed columns, no residual JSON | Two fact tables |
 | **Partition / cluster** | `TIMESTAMP_TRUNC(publish_time, HOUR)` / `publisher_id, ssp_id, event_type` | `event_day` / `publisher_id, event_type, ad_unit_id` | `day` / `publisher_id, ad_unit_id` (+ `ssp_id`) |
 | **Retention** | 90 days | 13 months | Indefinite |
 | **Consumer** | Reprocessing, and the DE team | The DE team, operationally | BI, and the Part 2 copilot — through views |
 
-Retention follows one principle rather than four negotiations: **pay indefinitely for the copy that cannot be recreated, and the shortest useful window for every copy that can.**
+Retention follows one principle instead of four separate debates: **pay indefinitely for the copy that cannot be recreated, and pay for the shortest useful window for every copy that can.**
 
-- **GCS raw, indefinite** — the only irreplaceable copy. Gold's dimensions are fixed at design time and Silver's schema at transform time, so neither answers for a field never typed.
+- **GCS raw, indefinite** — the only irreplaceable copy. Gold's dimensions are fixed at design time and Silver's schema at transform time, so neither can answer a question about a field that was never typed.
 - **Bronze, 90 days** — the reprocessing window, long enough that a live incident is repaired from Bronze rather than from the archive.
-- **Silver, 13 months** — spans a year-over-year comparison without a rebuild. A convenience, not a capability, and buyable back at any time because Silver is derived.
-- **Gold, indefinite — and it is the exception.** Recreatable, yet kept forever, because at ~1M rows/day it is four orders of magnitude below the event layers: its retention is not a cost decision.
+- **Silver, 13 months** — covers a year-over-year comparison without a rebuild. A convenience, not a capability, and we can buy it back at any time because Silver is derived.
+- **Gold, indefinite — and it is the exception.** It can be recreated, yet we keep it forever: at \~1M rows/day it is four orders of magnitude smaller than the event layers, so its retention is not a cost decision.
 
 ## Bronze — accepts everything, validates nothing
 
-A fixed typed header we enforce, plus one JSON column absorbing whatever else that SSP or event type sent. **A new SSP field means no schema migration, no dropped events, no pipeline deploy.**
+A fixed typed header we enforce, plus one JSON column that absorbs whatever else the SSP or the event type sent. **A new SSP field means no schema migration, no dropped events, no pipeline deploy.**
 
-Only STRING columns are promoted out of the payload — `event_id`, `publisher_id`, `ssp_id`, `event_type` — and the cut falls there for a reason that is not stylistic: **a STRING cannot fail to accept a value.** `NUMERIC price` and `TIMESTAMP event_timestamp` *can* fail on malformed or skewed input, and promoting them would make Bronze validate, which is the next layer's job.
+Only STRING columns are promoted out of the payload — `event_id`, `publisher_id`, `ssp_id`, `event_type` — The line falls there for a concrete reason: **a STRING cannot refuse a value.** `NUMERIC price` and `TIMESTAMP event_timestamp` *can* fail on malformed or skewed input, and promoting them would make Bronze validate, which is the next layer's job.
 
-So Bronze rejects nothing that is a well-formed envelope. The only thing refusable is a message violating the topic schema, and that is dead-lettered individually rather than dropped.
+So Bronze rejects nothing that is a well-formed envelope. The only message it can refuse is one that violates the topic schema, and that one is dead-lettered alone, not dropped.
 
 **90 days** is the reprocessing window — long enough that any live incident is repaired from Bronze rather than from the archive.
 
@@ -46,25 +48,25 @@ So Bronze rejects nothing that is a well-formed envelope. The only thing refusab
 | `gross_revenue` | NUMERIC | `price` converted to the reporting currency |
 | `publisher_payout` | NUMERIC | `gross_revenue` × the publisher's share for that day |
 
-Three properties are load-bearing:
+The properties that carry this layer:
 
-**Enrichment from mutable reference data happens here, never at ingest.** Revenue share terms and FX rates get corrected retroactively — a revenue share renegotiated mid-month and backdated to the 1st makes every `publisher_payout` for that month wrong on data that is otherwise *complete and healthy*. Nothing is missing, so no retry and no late-arrival window repairs it. Applied at ingest, that repair becomes a GCS replay, because the raw record now carries a derived value with a stale rate baked in. Applied in Silver, it is a transform rerun over a bounded set of partitions, with Bronze untouched and still correct.
+**Enrichment from mutable reference data happens here, never at ingest.** Revenue share terms and FX rates are corrected after the fact. A revenue share renegotiated mid-month and applied from the 1st makes every `publisher_payout` of that month wrong, on data that is otherwise *complete and healthy*. Nothing is missing, so no retry and no late-arrival window repairs it. If enrichment happened at ingest, the repair would be a GCS replay, because the raw record would already carry a value computed with the old rate. In Silver, the repair is a transform rerun over a limited set of partitions, and Bronze stays untouched and correct.
 
-**And the reference data it enriches from is declared, not built.** Neither `ref_fx_rate` nor `ref_revenue_share` is something we measure; both are business inputs their owners already maintain — a finance-owned rate table, a contract export. BigQuery reads them as **Drive-backed external tables**, declared in Dataform and reached through `${ref()}` like any other source: no loader, no schedule, nothing to fail. **The FX rate is a finance input, not a data-engineering input — there is no API to call.** The guardrail is a Dataform assertion: every `impression` row in the days being built must resolve to a non-null `publisher_payout`, so a lapsed contract row fails the build instead of silently nulling revenue.
+**The reference data it uses is declared, not built.** We do not measure `ref_fx_rate` or `ref_revenue_share`. Both are business inputs their owners already maintain: a finance-owned rate table, a contract export. BigQuery reads them as **Drive-backed external tables**, declared in Dataform and reached with `${ref()}` like any other source: no loader, no schedule, nothing to fail. **The FX rate is a finance input, not a data-engineering one, and there is no API to call.** The guardrail is a Dataform assertion: every `impression` row in the days being built must have a non-null `publisher_payout`, so an expired contract row fails the build instead of nulling revenue silently.
 
-**`ssp_id` is nullable, and only for `auction`.** An auction opens before any SSP is involved — in Prebid, `auctionInit` fires at `requestBids()` and `ssp_id` first exists at `bidResponse`. `NOT NULL` would force a sentinel value that every downstream query has to remember. This same fact produces two Gold tables below.
+**`ssp_id` is nullable, and only for `auction`.** An auction opens before any SSP is involved: in Prebid, `auctionInit` fires at `requestBids()`, and `ssp_id` exists only from `bidResponse`. `NOT NULL` would force a placeholder value that every downstream query must remember. This same fact is what produces two Gold tables below.
 
 **Money is computed on `impression` rows only.** `price` appears on `bid` (the offer), `win` (the clearing price) and `impression` (the clearing price again), but a win that never renders earns nothing. Summing revenue over impressions is the only definition consistent with eCPM's denominator.
 
-Types are enforced at this boundary, which is the whole reason Bronze promoted only STRINGs. Rows that fail typing are routed to a rejects table with their raw payload attached rather than failing the run — **one publisher sending garbage must not stop Silver for everyone.**
+Types are enforced at this boundary, which is the whole reason Bronze promoted only STRINGs. Rows that fail typing go to a rejects table with their raw payload attached, instead of failing the run — **one publisher sending garbage must not stop Silver for everyone.**
 
-**Silver keeps no residual payload**, so its contract is *typed and only typed*. Retaining the leftover JSON would cost roughly 4× (~$3,000/month against ~$800) to buy a shorter-lived, partial copy of what GCS already holds indefinitely. Promoting a field later is a SQLX change plus a backfill — from Bronze inside 90 days, from the archive beyond it.
+**Silver keeps no leftover payload**, so its contract is *typed and only typed*. Keeping that JSON would cost about 4× (\~$3,000/month against \~$800), to buy a shorter-lived, partial copy of what GCS already holds indefinitely. Promoting a field later is a SQLX change plus a backfill: from Bronze within 90 days, from the archive after that.
 
-## Gold — two fact tables, because there are two denominators
+## Gold — two fact tables, two denominators
 
-Daily and dimensioned, not daily totals: the copilot's *"why"* decomposition is only cheap if the dimensions it drills into already exist.
+Daily and dimensioned, not daily totals: the copilot's *"why"* breakdown is only cheap if the dimensions it drills into already exist.
 
-The obvious design is a single table at `day × publisher × ad_unit × ssp × format × device × channel`. **That grain cannot hold `auctions`** — and `auctions` is the denominator of fill rate. An auction carries no `ssp_id`, and while it knows *which* SSPs were invited, that is an **array, not a scalar dimension**. Attaching it fans one auction out into N rows and inflates the opportunity count by the number of SSPs invited, 10-20×.
+The obvious design is a single table at `day × publisher × ad_unit × ssp × format × device × channel`. **That grain cannot hold `auctions`**, and `auctions` is the denominator of fill rate. An auction carries no `ssp_id`. It does know *which* SSPs were invited, but that is an **array, not a single value**. Using it splits one auction into N rows and multiplies the opportunity count by the number of SSPs invited, 10-20×.
 
 **`gold_opportunity`** — `day × publisher_id × ad_unit_id × format × device × channel`
 `auctions` · `auctions_with_bid` · `responses` · `bids` · `wins` · `impressions` · `gross_revenue` · `publisher_payout`
@@ -72,37 +74,37 @@ The obvious design is a single table at `day × publisher × ad_unit × ssp × f
 **`gold_ssp`** — `day × publisher_id × ad_unit_id × ssp_id × format × device × channel`
 `bids` · `no_bids` · `wins` · `impressions` · `gross_revenue` · `publisher_payout`
 
-The weak argument for two tables is *"measures at different grains belong in different fact tables"* — Kimball-standard, and it invites *"then just aggregate away the SSP dimension"*. The strong argument is that **each table has a denominator the other cannot express**:
+The weak argument for two tables is *"measures at different grains belong in different fact tables"*. It is standard Kimball, and it invites the reply *"then aggregate the SSP dimension away"*. The strong argument: **each table has a denominator the other cannot express.**
 
 | Table | Denominator | The question only it answers |
 |---|---|---|
 | `gold_opportunity` | `auctions` | *What share of our inventory sold?* — including auctions nobody bid on, which is exactly the unsold inventory the Yield team exists to fix |
-| `gold_ssp` | `bids + no_bids` for that SSP | *Of the auctions SSP X was invited to, how often did it respond and win?* — i.e. is X worth keeping |
+| `gold_ssp` | `bids + no_bids` for that SSP | *Of the auctions SSP X was invited to, how often did it respond and win?* — in other words, is X worth keeping |
 
 Every invited SSP produces exactly one response, so `bids + no_bids` is the count of opportunities *that SSP actually saw*.
 
-> **An analyst asks why SSP 7's fill rate looks catastrophic.** It isn't. SSP 7 is invited to 4% of auctions, so measured against every opportunity it looks like it never delivers. Measured against the auctions it was actually invited to, it performs fine. A single fact table keyed by SSP offers only the first number — and the decision that number drives is *"drop SSP 7"*.
+> **An analyst asks why SSP 7's fill rate looks catastrophic.** It isn't. SSP 7 is invited to 4% of auctions, so measured against every opportunity it looks like it never delivers. Measured against the auctions it was actually invited to, it performs fine. A single fact table keyed by SSP gives only the first number, and the decision that number drives is *"drop SSP 7"*.
 
-**On the duplication:** `wins`, `impressions`, `gross_revenue` and `publisher_payout` appear in both tables. They are a **conformed rollup, not a copy** — summing `gold_ssp` over `ssp_id` reproduces them in `gold_opportunity` exactly, and both are built by the same job in the same run from the same Silver rows, so they cannot drift. The alternative pushes a correctness trap into every consumer, including a copilot composing its own SQL.
+**On the duplication:** `wins`, `impressions`, `gross_revenue` and `publisher_payout` appear in both tables. They are a **conformed rollup, not a copy**: summing `gold_ssp` over `ssp_id` reproduces the `gold_opportunity` values exactly, and the same job builds both in the same run from the same Silver rows, so they cannot drift. The alternative moves a correctness risk into every consumer, including a copilot writing its own SQL.
 
-**`auctions_with_bid` must be stored, and the principle matters more than the column:** any count requiring per-event evaluation has to be computed during the Gold build. Once rows are aggregated to daily grain, *"how many auctions drew zero bids"* is unrecoverable — the aggregation destroyed the information. This is the boundary between what a semantic layer can define and what Gold must supply.
+**`auctions_with_bid` must be stored, and the principle matters more than the column:** any count that needs per-event evaluation must be computed during the Gold build. Once rows are aggregated to daily grain, *"how many auctions received zero bids"* cannot be recovered: the aggregation destroyed the information. This is the line between what a semantic layer can define and what Gold must supply.
 
-**The build rule:** every 4 hours, rebuild every day inside a trailing **3-day window** whose Silver rows changed. Cadence and window are different levers — the cadence buys recovery *latency*, the window buys recovery *reach*. Three days is sized to the worst realistic detection delay: a Friday failure found Monday sits at exactly D-3.
+**The build rule:** every 4 hours, rebuild each day inside a trailing **3-day window** whose Silver rows changed. Frequency and window are two different levers: the frequency buys recovery *speed*, the window buys recovery *reach*. Three days matches the worst realistic detection delay: a Friday failure found on Monday sits at exactly D-3.
 
-**A third table sits beside the two facts — `quality_day`, which records whether each day is complete**: hourly counts and lateness from the daily quality job. It lives in Gold so Part 2's copilot can check whether a day is trustworthy through the grant it already has, with no access exception into Silver.
+**A third table sits beside the two fact tables: `quality_day`, which records whether each day is complete** — hourly counts and lateness from the daily quality job. It lives in Gold so Part 2's copilot can check whether a day is trustworthy with the access it already has, and needs no exception into Silver.
 
 ## Rejected — one line each
 
 | Option | Why not |
 |---|---|
-| **A single Gold fact table at SSP grain** | Cannot express `auctions`; forces either a 10-20× opportunity overcount or a sentinel row every query must remember |
+| **A single Gold fact table at SSP grain** | Cannot express `auctions`; forces either a 10-20× opportunity overcount or a placeholder row every query must remember |
 | **One Silver table per event type** | Multiplies the `MERGE`, the partitioning and the watermark by five to save a predicate |
-| **Residual JSON retained in Silver** | ~4× the storage, to buy a shorter-lived partial copy of what the GCS archive already holds indefinitely |
+| **Residual JSON retained in Silver** | \~4× the storage, to buy a shorter-lived partial copy of what the GCS archive already holds indefinitely |
 | **Enrichment applied at ingest** | Turns a backdated revenue-share correction from a bounded transform rerun into a GCS replay |
 | **Validation in Bronze** | Makes the landing layer capable of rejecting, which is the one thing it must never do |
 | **Deriving `auctions_with_bid` in the view** | The per-event evaluation it needs no longer exists after aggregation |
-| **Unconditional rebuild of the whole Gold window** | ~5× the scan to almost always produce byte-identical output — the lever to pull *if* scan cost becomes material, not now |
+| **Unconditional rebuild of the whole Gold window** | \~5× the scan, to produce output that is almost always identical. The lever to pull *if* scan cost becomes significant, not now |
 
 ---
 
-Next: [**2.2 — Bronze partitioning and clustering**](/part_1/05-bronze-partitioning.md)
+Next: [**2.2 — Partition by arrival, cluster by publisher**](/part_1/05-bronze-partitioning.md)

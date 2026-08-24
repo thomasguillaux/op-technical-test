@@ -97,7 +97,7 @@ Their rhythm is **look at yesterday, act today**: they analyse complete Days and
 
 ## Scale
 
-**~2 billion Events per day**, roughly 1.5 TB of raw payload. Bid and No-bid together account for 75-80% of that count, since they alone multiply by the number of SSPs invited.
+**\~2 billion Events per day**, roughly 1.5 TB of raw payload. Bid and No-bid together account for 75-80% of that count, since they alone multiply by the number of SSPs invited.
 
 ## Conventions
 
