@@ -20,6 +20,8 @@ Two sentences, two obligations:
 
 **The instinct is that raw is the irreplaceable copy and must be kept longest. Under this rule it is the reverse.** Raw is legally transient, so the irreplaceable copy is the first layer *allowed* to persist.
 
+**Which means the medallion convention — Bronze is the source of truth — does not hold here.** The source of truth is Silver; Bronze is a landing and replay buffer whose window is set by law rather than by us.
+
 Why Silver and not Gold, which is anonymous, aggregated and far smaller:
 
 > Gold's dimension combinations are fixed at design time. Silver's are not fixed until query time.
