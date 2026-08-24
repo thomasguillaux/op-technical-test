@@ -119,6 +119,36 @@
     }
     .markdown-section .mermaid svg { max-width: 100%; height: auto; }
 
+    /* ---------- GCP component icons, part 1.2 ---------- */
+    .markdown-section h2[id="pubsub"]::before,
+    .markdown-section h2[id="cloud-storage"]::before,
+    .markdown-section h2[id="bigquery"]::before,
+    .markdown-section h2[id="dataflow-beam-rejected"]::before,
+    .markdown-section h2[id="airflow-composer-rejected-dataform-instead"]::before {
+      content: "";
+      display: inline-block;
+      width: 22px;
+      height: 22px;
+      margin-right: 8px;
+      vertical-align: middle;
+      background-size: contain;
+      background-repeat: no-repeat;
+    }
+    .markdown-section h2[id="pubsub"]::before                                        { background-image: url("assets/icons/pubsub.png"); }
+    .markdown-section h2[id="cloud-storage"]::before                                  { background-image: url("assets/icons/storage.png"); }
+    .markdown-section h2[id="bigquery"]::before                                       { background-image: url("assets/icons/bigquery.png"); }
+    .markdown-section h2[id="dataflow-beam-rejected"]::before                         { background-image: url("assets/icons/dataflow.png"); }
+    .markdown-section h2[id="airflow-composer-rejected-dataform-instead"]::before     { background-image: url("assets/icons/composer.png"); }
+
+    /* ---------- search ---------- */
+    .sidebar .search { border-bottom: 1px solid var(--border); }
+    .sidebar .search input { background: var(--sidebar-bg); color: var(--sidebar-fg); border-color: var(--border); }
+    .sidebar .search .results-panel { color: var(--page-fg); }
+    .sidebar .search h2 { color: var(--heading-fg); }
+    .sidebar .search a { color: var(--sidebar-fg); }
+    .sidebar .search .matching-post p { color: var(--sidebar-fg); }
+    .sidebar .search .clear-button { color: var(--sidebar-fg); }
+
     /* ---------- theme switch ---------- */
     #theme-switch {
       position: fixed;
@@ -225,6 +255,11 @@
           }
         }
       },
+      search: {
+        depth: 3,
+        noData: 'No results.',
+        placeholder: 'Search'
+      },
       plugins: [
         function (hook) {
           hook.doneEach(function () { renderMermaid(); });
@@ -234,6 +269,7 @@
   </script>
   <script src="//cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/docsify/lib/docsify.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/search.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
 </body>
 </html>

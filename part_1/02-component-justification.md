@@ -10,7 +10,7 @@
 | **Dataflow / Beam** | **Rejected** — condition to reinstate stated | The only work it would do is move four values from inside a JSON object to beside it |
 | **Airflow / Composer** | **Rejected** — Dataform instead | Right for a mixed DAG. This DAG has one system in it |
 
-## <img src="../assets/icons/pubsub.png" width="22" style="vertical-align:middle"> Pub/Sub
+## Pub/Sub
 
 *"It decouples producers from consumers"* justifies nothing — a load balancer decouples too. Two specific properties:
 
@@ -19,7 +19,7 @@
 
 **Beaten alternative:** the collector writing straight to BigQuery via the Storage Write API. One component fewer, and no buffer — every downstream failure becomes data loss at the producer.
 
-## <img src="../assets/icons/storage.png" width="22" style="vertical-align:middle"> Cloud Storage
+## Cloud Storage
 
 Fidelity is not the reason: the producer supplies the envelope split, so Bronze already holds the complete message. Three jobs remain:
 
@@ -33,7 +33,7 @@ Job 3 is what sets retention to indefinite: **keeping unread data costs a few th
 
 **Beaten alternative:** a scheduled export from Bronze instead of a second subscription. It saves the export fee, \~$25k/year, and covers jobs 1 and 3. It fails job 2: the safety copy would pass through the system it exists to survive.
 
-## <img src="../assets/icons/bigquery.png" width="22" style="vertical-align:middle"> BigQuery
+## BigQuery
 
 Four properties are doing real work:
 
@@ -46,7 +46,7 @@ Four properties are doing real work:
 
 **Beaten alternative:** GCS + BigLake as the primary store. Cheaper storage, but no `MERGE`, no real partition pruning, no clustering — it deletes the dedup guarantee and the cost strategy together.
 
-## <img src="../assets/icons/dataflow.png" width="22" style="vertical-align:middle"> Dataflow / Beam — rejected
+## Dataflow / Beam — rejected
 
 > **Dataflow is right when the transformation cannot be expressed as a query over data the warehouse can already read.**
 
@@ -72,7 +72,7 @@ What decides it is the operational surface:
 
 **What brings it back:** the producer refuses to emit the split. Then a streaming Dataflow job does it, and nothing downstream changes. That dependency has a real cost, because it puts work on a team we do not control. The defence: we ask for a message format, not analytical work. Their collector already routes on `publisher_id` and `event_type` today.
 
-## <img src="../assets/icons/composer.png" width="22" style="vertical-align:middle"> Airflow / Composer — rejected, Dataform instead
+## Airflow / Composer — rejected, Dataform instead
 
 Airflow is right for a mixed DAG: trigger a job, wait for an object, call a vendor API, load a warehouse. **Once the subscriptions have landed the data, this pipeline's whole job list is:** version the SQL, know that Gold depends on Silver, run three schedules, alert on failure, allow a rerun for backfills. Nothing event-driven, no branching, nothing outside BigQuery. **The whole decision is sizing the orchestrator to that list.**
 
