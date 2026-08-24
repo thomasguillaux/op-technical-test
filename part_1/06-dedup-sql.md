@@ -169,7 +169,7 @@ This is safe **because `publish_time` is stamped by the platform**. But *stamped
 
 > **A message stamped 10:29:58 becomes queryable at 10:30:04.** The subscription writes Bronze in parallel, so the order rows are *stamped* is not the order they *appear*. The 10:30 Silver run had already read; the highest stamp it saw was 10:29:59. Had that become the new line, the 10:29:58 row would have sat behind it forever — merged by nothing, counted by nothing, and no job would have failed.
 
-So the line is saved **two minutes behind `batch_max`**, and every run re-reads the last two minutes of the previous one. **The `MERGE` throws the repeats away — that is the job it already does** — so the overlap costs scan and nothing else: ~7% of the Bronze read. *Failure has to land in the direction of doing work twice, never in the direction of skipping it.*
+So the line is saved **two minutes behind `batch_max`**, and every run re-reads the last two minutes of the previous one. **The `MERGE` throws the repeats away — that is the job it already does** — so the overlap costs scan and nothing else: \~7% of the Bronze read. *Failure has to land in the direction of doing work twice, never in the direction of skipping it.*
 
 The watermark lives in a table, `pipeline_state`, one row per model — not in a `SELECT MAX(...) FROM ${self()}`. That `MAX` is over a non-partitioned column on a table with `require_partition_filter = TRUE`, so **BigQuery refuses to run it**, and a row makes the watermark *settable*: *"reprocess from Tuesday"* is an `UPDATE` rather than a code change.
 

@@ -39,14 +39,14 @@ There is a second, stronger reason: **the producer's timestamps are not Bronze c
 
 The test says *"partitioned by date"*, and daily is the reflex reading of it. The *column* does not change; only the grain does, and the dominant query is what decides it.
 
-**The dominant Bronze query is not a human's — it is Silver's watermark read, 48 times a day.** `WHERE publish_time > watermark` wants the last 30 minutes of arrivals. At daily grain it prunes to one partition and then scans everything accumulated inside it, reading `payload` for every JSON path — and `payload` is ~90% of the row width. At 02:00 the day is nearly empty; at 23:30 the run reads most of ~1.5 TB to find thirty minutes of rows.
+**The dominant Bronze query is not a human's — it is Silver's watermark read, 48 times a day.** `WHERE publish_time > watermark` wants the last 30 minutes of arrivals. At daily grain it prunes to one partition and then scans everything accumulated inside it, reading `payload` for every JSON path — and `payload` is \~90% of the row width. At 02:00 the day is nearly empty; at 23:30 the run reads most of \~1.5 TB to find thirty minutes of rows.
 
 **Block min/max metadata does not save it, and the reason is our own DDL.** BigQuery's automatic reclustering sorts blocks by the cluster keys, so `CLUSTER BY publisher_id, ssp_id, event_type` *scatters* `publish_time` across blocks. The clustering the test asked for destroys the arrival order that would have made block pruning work. Once clustering is fixed, partition grain is the only lever left.
 
 | Bronze grain | Silver's read, per run | × 48 runs/day | Scan cost |
 |---|---|---|---|
-| **DAY** | ~750 GB (day average) | ~36 TB/day | **~$6,100/month** |
-| **HOUR** | ~124 GB | ~6 TB/day | **~$1,000/month** |
+| **DAY** | \~750 GB (day average) | \~36 TB/day | **\~$6,100/month** |
+| **HOUR** | \~124 GB | \~6 TB/day | **\~$1,000/month** |
 
 ```mermaid
 flowchart LR
@@ -70,9 +70,9 @@ flowchart LR
   class C2 ok;
 ```
 
-Both figures double, because the `batch_days` DECLARE in bullet 2.3 issues the same scan a second time. **~$10,000/month of difference, on one clause of DDL** — four times the second export subscription that bullet 1.2 argues at length.
+Both figures double, because the `batch_days` DECLARE in bullet 2.3 issues the same scan a second time. **\~$10,000/month of difference, on one clause of DDL** — four times the second export subscription that bullet 1.2 argues at length.
 
-> **The retention change did not touch this figure, and that is why it is here.** Bronze's *storage* fell from ~$1,600/month to ~$140 when the window went from 90 days to 7. This scan cost did not move at all, because it is per-run. **Retention drives storage; partition grain drives compute; and the compute number is the larger one.** Cutting retention by 92% saved less than choosing the right grain does.
+> **Retention does not touch this figure, and that is why it is here.** A 7-day window puts Bronze *storage* at \~$140/month against \~$1,600 at 90 days — but the scan cost above is per-run, so the window does not move it at all. **Retention drives storage; partition grain drives compute; and the compute number is the larger one.** A 92% cut in retention saves less than choosing the right grain does.
 
 **The partition limit is not a consideration:** 7 days × 24 = **168 partitions** against a ceiling of 10,000. Worth a sentence only because *"hourly partitioning hits the partition limit"* is the reflex challenge.
 
@@ -100,17 +100,17 @@ BigQuery clustering is **prefix-ordered**: rows are sorted by the first key, the
 
 ## What this costs to query
 
-A query naming an arrival range and a publisher prunes to a few ~62 GB partitions, then to the blocks holding that publisher: a few gigabytes, so a few cents. The same query with no partition filter would scan **10.5 TB** — the whole window. **That is why `require_partition_filter = TRUE` is in the DDL:** it *fails* instead of scanning seven days.
+A query naming an arrival range and a publisher prunes to a few \~62 GB partitions, then to the blocks holding that publisher: a few gigabytes, so a few cents. The same query with no partition filter would scan **10.5 TB** — the whole window. **That is why `require_partition_filter = TRUE` is in the DDL:** it *fails* instead of scanning seven days.
 
 **But Bronze is not where that setting earns its keep — Silver is.** Bronze's worst case is bounded at 10.5 TB by the expiration. **Silver has no expiration at all**, so it is the one table where an unqualified `SELECT` scans something that grows forever with no ceiling to hit. Silver sets the same option, and nothing of ours changes: every query this design runs against Silver already names its partitions.
 
-Two more options are cost decisions rather than defaults. **`max_time_travel_hours = 48`** is the minimum: Bronze is immutable and the GCS archive is the recovery path, and at the 7-day default time travel would span the *entire* retention window — paying to store a rollback capability covering data we are obliged to delete. **Physical storage billing** bills compressed bytes at 2× the rate, so it wins past 2:1 compression; Bronze is a ~$140/month table now, so it is Silver where the setting pays.
+Two more options are cost decisions rather than defaults. **`max_time_travel_hours = 48`** is the minimum: Bronze is immutable and the GCS archive is the recovery path, and at the 7-day default time travel would span the *entire* retention window — paying to store a rollback capability covering data we are obliged to delete. **Physical storage billing** bills compressed bytes at 2× the rate, so it wins past 2:1 compression; Bronze is a \~$140/month table now, so it is Silver where the setting pays.
 
 And **`partition_expiration_days = 7` makes retention a table property, not a job.** Nothing to schedule, nothing to fail, no purge job with a wrong predicate. **Under a compliance obligation this stops being an elegance argument:** *"show me your deletion process"* is answered by six words of table options, enforced by the storage engine and impossible to pause by pausing a scheduler.
 
 ## On-demand or a reservation
 
-Every figure above prices **bytes scanned**, which assumes on-demand at $6.25/TiB — the largest single cost lever in Part 1, so it is stated rather than defaulted into. The whole workload is 48 Silver runs, 24 Gold rebuilds and the quality job a day, plus ~10 analysts: **~360 TB/month, ~$2,250.**
+Every figure above prices **bytes scanned**, which assumes on-demand at $6.25/TiB — the largest single cost lever in Part 1, so it is stated rather than defaulted into. The whole workload is 48 Silver runs, 24 Gold rebuilds and the quality job a day, plus \~10 analysts: **\~360 TB/month, \~$2,250.**
 
 A reservation prices **slot-time** instead, which reverses the arithmetic. **An autoscaling Standard reservation would probably cost less, and claiming otherwise would be the same mistake as claiming Dataflow costs more.** On-demand wins on two things that are not price:
 
@@ -128,7 +128,7 @@ A reservation prices **slot-time** instead, which reverses the arithmetic. **An 
 | **Daily partitioning** | Makes every 30-minute Silver run scan the whole day so far: \~$6,100/month, doubled by the `batch_days` DECLARE. Block pruning cannot save it, because clustering spreads `publish_time` |
 | **`event_type` as the first cluster key** | Sorts every block by a 5-value column, and weakens the two keys the test named |
 | **No `require_partition_filter`** | Leaves a 10.5 TB unfiltered scan one typo away on Bronze — and an unbounded one on Silver |
-| **Logical storage billing** | Strictly worse: the data compresses ~3.4:1, far past the 2:1 break-even, and it roughly doubles the Silver bill, which is the one that grows |
+| **Logical storage billing** | Strictly worse: the data compresses \~3.4:1, far past the 2:1 break-even, and it roughly doubles the Silver bill, which is the one that grows |
 | **A BigQuery Editions reservation** | Probably cheaper on the pipeline side, but it shares slots with the Part 2 agent, turning a hallucinated query from a failed bill into a freshness incident. Revisit above \~450 TB/month |
 | **A scheduled purge job** | Partition expiration does the same with no code and no schedule — and under a legal obligation, no possibility of being quietly paused |
 

@@ -8,7 +8,7 @@ Each layer enforces exactly one rule, and that rule decides what may not happen 
 |---|---|---|---|
 | **Rule** | Accepts everything, validates nothing | Types, deduplicates, **anonymises**, applies anything that can later change | Aggregates to the grain the business asks its questions in |
 | **Grain** | One row per message | One row per event, deduplicated on `event_id` | One row per **hour** × dimensions |
-| **Shape** | Typed envelope + opaque `payload` JSON | ~26 typed columns, no residual JSON | Two fact tables + a quality table |
+| **Shape** | Typed envelope + opaque `payload` JSON | \~26 typed columns, no residual JSON | Two fact tables + a quality table |
 | **Partition / cluster** | `TIMESTAMP_TRUNC(publish_time, HOUR)` / `publisher_id, ssp_id, event_type` | `auction_day` / `publisher_id, event_type, ad_unit_id` | `DATE(auction_hour)` / `publisher_id, ad_unit_id` (+ `ssp_id`) |
 | **Retention** | **7 days** | **Indefinite** | Indefinite |
 | **Personal data** | **Yes** — the only layer that holds it | No | No |
@@ -144,7 +144,7 @@ The weak argument for two tables is *"measures at different grains belong in dif
 
 **The hourly cadence is set by *self-healing*, not by freshness** — a failed run is repaired by the next one instead of leaving D-1 wrong all day. **The freshness requirement independently demands the same number**, which is why the cadence is not a compromise between two pressures.
 
-**Cost.** The hourly rebuild is ~$450/month, against ~$113 at four-hourly and ~$900 at 30 minutes. Thirty minutes buys nothing: an hourly figure cannot exist before its hour ends.
+**Cost.** The hourly rebuild is \~$450/month, against \~$113 at four-hourly and \~$900 at 30 minutes. Thirty minutes buys nothing: an hourly figure cannot exist before its hour ends.
 
 ## `quality_hour` — a third table, beside the two fact tables
 
