@@ -127,8 +127,6 @@ CREATE TABLE gold.quality_day (
 PARTITION BY day;
 ```
 
-No `CLUSTER BY`. \~300 rows/day, the whole table stays tiny for years — nothing here is big enough for block pruning to matter.
-
 **Grain is `day × publisher_id`, not `day`.** *Which* publisher is late, or re-stamping, is the entire actionable content; a daily total names nobody. \~300 rows/day.
 
 | Column | The argument that needs it |
