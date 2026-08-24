@@ -91,16 +91,33 @@ Measuring an SSP against every Auction would make an SSP invited to a small slic
 
 **Yield team** — the internal team that tunes monetization: floor prices, SSP mix, placement configuration. Small — around ten people — and every member sees every Publisher.
 
-Their rhythm is **look at yesterday, act today**: they analyse complete Days and change configuration in response. They do not watch the current Day as it accumulates.
+They work on **two rhythms**, and they are different instruments rather than two resolutions of one need:
 
-**Data engineering team** — owns the pipeline. The only consumers of current-Day data, and for operational reasons rather than business ones: whether Events are still arriving, and whether a given Publisher has gone quiet.
+- **Look at yesterday, act today** — analyse complete Days, change configuration in response. Trend work.
+- **Ship, then watch** — after a configuration or release change, watch the next few closed Hours to see whether it broke something. Episodic: nobody watches an hourly chart all day, but on a deploy day a closed Hour is read within minutes of closing.
+
+**Data engineering team** — owns the pipeline. Consumers of current-Day data for operational reasons: whether Events are still arriving, and whether a given Publisher has gone quiet.
 
 ## Scale
 
 **\~2 billion Events per day**, roughly 1.5 TB of raw payload. Bid and No-bid together account for 75-80% of that count, since they alone multiply by the number of SSPs invited.
 
+**Raw logs are retained 7 days.** A constraint given by the client, not chosen. Everything retained beyond that must be **Anonymous**.
+
+**No free text.** Every field on the stream is a structured auction attribute — bid value, filled/unfilled, bidders, winner. Nothing is prose or user-supplied string content.
+
 ## Conventions
 
 **Day** — the UTC calendar day, everywhere. An Event's day is the day it *happened*, not the day it reached us; the one-hour lifecycle bound caps how far those can diverge.
+
+**Hour** — the UTC clock hour. An Auction belongs to the Hour it **opened**, and every Event of that Auction belongs to the same one — including a Win or Impression that fires after the Hour has closed. This is a convention rather than a decision only in the sense that the alternative was considered and rejected; the argument is in [gold.md](docs/design_decisions/gold.md).
+
+**Settled** — an Hour is settled once no further Events for it can arrive: the lifecycle bound and the duplicate-arrival bound have both elapsed. An Hour that has closed on the clock is not yet settled, and the two are routinely confused.
+
+**Source** — the origin system a raw Event came from. Sources do not agree on payload shape, and not every Source reports every **Event** type. Distinct from **SSP**: one Source may carry events about many SSPs.
+
+**Coverage** — for a given measurement, the share of contributing **Sources** that are capable of reporting it. Below 1, a metric describes fewer Sources than the slice contains, and is not comparable with one at 1.
+
+**Anonymous** — for this pipeline's purposes: carrying no field that identifies a person, and no key that can be linked back to one. **Pseudonymous is not anonymous while a re-linking key still exists** — which is why the boundary is defined by what the raw layer retains, not only by what the aggregated layer contains.
 
 **Currency** — SSPs report prices in their own currency. A single reporting currency is used everywhere the business sees a figure. *Where* in the pipeline conversion happens is a decision, not a convention — see [silver.md](docs/design_decisions/silver.md).

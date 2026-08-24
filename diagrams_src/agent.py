@@ -51,15 +51,15 @@ with Diagram(
 
     with Cluster("fixed SQL — because a wrong explanation does not"):
         diagnose = PredefinedProcess(
-            "diagnose_change\nquality → structural →\nrate effect vs mix effect"
+            "diagnose_change(grain)\nsettled? → structural →\nrate effect vs mix effect"
         )
 
     resolve = PredefinedProcess("resolve_entity\nlive dimension values,\nnot a vector index")
 
     with Cluster("4. IAM — the only dataset the service account holds SELECT on"):
-        v_opp = BigQuery("v_opportunity")
-        v_ssp = BigQuery("v_ssp")
-        quality = BigQuery("quality_day")
+        v_opp = BigQuery("v_opportunity_hourly / _daily")
+        v_ssp = BigQuery("v_ssp_hourly / _daily")
+        quality = BigQuery("quality_hour")
 
     with Cluster("Outside the grant", graph_attr={"style": "dashed"}):
         raw = BigQuery("bronze_events · silver_events\ngold base tables")
@@ -78,7 +78,7 @@ with Diagram(
     v3 >> v_ssp
     diagnose >> Edge(label="reads the same views") >> v_opp
     diagnose >> v_ssp
-    diagnose >> Edge(label="is the day complete?", style="dotted") >> quality
+    diagnose >> Edge(label="is the period settled?", style="dotted") >> quality
     resolve >> Edge(style="dotted") >> v_opp
 
     v3 >> DENIED >> raw
