@@ -1,13 +1,13 @@
 # Methodology
 
-> **Every component in this design survived an argument for its own deletion.**
-> Several the test names did not.
+> **Every component in this design survived an argument for deleting it.**
+> Several components named in the test did not.
 
-*The company is referred to as **OptimusAds** throughout, and publisher names and identifiers are anonymized on the same basis, because this write-up lives in a public repository. Nothing else is altered.*
+*This repository is public, so the company is called **OptimusAds** here and publisher names and identifiers are anonymized. Nothing else is changed.*
 
 ## Requirements are the input; components are the output
 
-Drawing the five boxes the test names and connecting them produces an architecture nobody can defend, because nothing was ever asked to justify itself. Where a named component is missing, the reason it lost and the condition that would bring it back are recorded — which is why most sections carry a **Rejected** table. The alternative that lost is more informative than the option that won, and it is the part a reviewer can actually test.
+Drawing the five boxes named in the test and connecting them gives an architecture nobody can defend: no component ever had to justify itself. So most sections end with a **Rejected** table. Where a named component is missing, that table gives the reason it lost and the condition that would bring it back. The option that lost says more than the option that won, and it is the part a reviewer can test.
 
 ## How it was built
 

@@ -2,22 +2,174 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>OptimusAds — Technical Test</title>
+  <title>Technical Test</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
   <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify/lib/themes/vue.css">
+  <style>
+    /* ---------- palette ---------- */
+    :root {
+      --page-bg:     #ffffff;
+      --page-fg:     #34495e;
+      --heading-fg:  #2c3e50;
+      --sidebar-bg:  #ffffff;
+      --sidebar-fg:  #505d6b;
+      --border:      #e3e8ee;
+      --table-alt:   #f8fafc;
+      --inline-bg:   #f2f4f7;
+      --inline-fg:   #2e8b57;
+      --accent:      #2e8b57;
+      --code-bg:     #f6f8fa;
+      --code-fg:     #3b4754;
+      --code-border: #e1e7ee;
+      --tok-keyword: #a626a4;
+      --tok-func:    #0184bc;
+      --tok-string:  #3f8a3f;
+      --tok-number:  #b26100;
+      --tok-punct:   #7c8794;
+      --tok-comment: #9aa5b1;
+    }
+    html[data-theme="dark"] {
+      --page-bg:     #1b2027;
+      --page-fg:     #c7d0da;
+      --heading-fg:  #e8eef5;
+      --sidebar-bg:  #171b21;
+      --sidebar-fg:  #a7b2be;
+      --border:      #2c333c;
+      --table-alt:   #20262e;
+      --inline-bg:   #262d36;
+      --inline-fg:   #2e8b57;
+      --code-bg:     #232a33;
+      --code-fg:     #dbe3ec;
+      --code-border: #2f3742;
+      --tok-keyword: #e39ddb;
+      --tok-func:    #79c0ff;
+      --tok-string:  #a5d6a7;
+      --tok-number:  #ffb86c;
+      --tok-punct:   #9fb0c0;
+      --tok-comment: #7d8895;
+    }
+
+    /* ---------- page ---------- */
+    body, .sidebar, .content { background: var(--page-bg); }
+    .sidebar { background: var(--sidebar-bg); border-right: 1px solid var(--border); }
+    .sidebar ul li a { color: var(--sidebar-fg); }
+    .sidebar ul li.active > a { color: var(--accent); }
+    .sidebar-toggle { background-color: transparent; }
+    .app-name-link { color: var(--heading-fg) !important; }
+    .markdown-section { color: var(--page-fg); }
+    .markdown-section h1,
+    .markdown-section h2,
+    .markdown-section h3,
+    .markdown-section h4,
+    .markdown-section strong { color: var(--heading-fg); }
+    .markdown-section blockquote { color: var(--page-fg); border-left-color: var(--border); }
+    .markdown-section tr { border-top-color: var(--border); background: var(--page-bg); }
+    .markdown-section tr:nth-child(2n) { background: var(--table-alt); }
+    .markdown-section th, .markdown-section td { border-color: var(--border); }
+    .markdown-section hr { border-color: var(--border); }
+
+    /* ---------- code ---------- */
+    .markdown-section code:not([class*="lang-"]) {
+      background: var(--inline-bg);
+      color: var(--inline-fg);
+    }
+    .markdown-section pre[data-lang] {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 6px;
+      padding: 1.1em 1.3em;
+      overflow-x: auto;
+    }
+    .markdown-section pre[data-lang]::after {
+      content: attr(data-lang);
+      color: var(--tok-comment);
+      background: transparent;
+      padding: 4px 10px;
+      font-size: 11px;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      top: 0;
+      right: 0;
+    }
+    .markdown-section pre[data-lang] > code {
+      background: transparent;
+      color: var(--code-fg);
+      font-size: 13.5px;
+      line-height: 1.6;
+      white-space: pre;
+    }
+    .markdown-section pre[data-lang] .token.keyword,
+    .markdown-section pre[data-lang] .token.boolean,
+    .markdown-section pre[data-lang] .token.null {
+      color: var(--tok-keyword);
+      font-weight: 600;
+    }
+    .markdown-section pre[data-lang] .token.function { color: var(--tok-func); }
+    .markdown-section pre[data-lang] .token.string   { color: var(--tok-string); }
+    .markdown-section pre[data-lang] .token.number   { color: var(--tok-number); }
+    .markdown-section pre[data-lang] .token.operator,
+    .markdown-section pre[data-lang] .token.punctuation { color: var(--tok-punct); background: transparent; }
+    .markdown-section pre[data-lang] .token.comment  { color: var(--tok-comment); font-style: italic; }
+
+    /* ---------- theme switch ---------- */
+    #theme-switch {
+      position: fixed;
+      top: 14px;
+      right: 18px;
+      z-index: 30;
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      background: var(--page-bg);
+      color: var(--page-fg);
+      font-size: 15px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    #theme-switch:hover { border-color: #42b983; color: #42b983; }
+    @media print { #theme-switch { display: none; } }
+  </style>
 </head>
 <body>
+  <button id="theme-switch" type="button" title="Light / dark" aria-label="Toggle light or dark theme">☾</button>
   <div id="app"></div>
   <script>
+    (function () {
+      var saved;
+      try { saved = localStorage.getItem('theme'); } catch (e) { saved = null; }
+      var dark = saved
+        ? saved === 'dark'
+        : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+      function apply(isDark) {
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        var btn = document.getElementById('theme-switch');
+        if (btn) btn.textContent = isDark ? '☀' : '☾';
+      }
+      apply(dark);
+
+      document.addEventListener('DOMContentLoaded', function () {
+        apply(document.documentElement.getAttribute('data-theme') === 'dark');
+        document.getElementById('theme-switch').addEventListener('click', function () {
+          dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+          apply(dark);
+          try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
+        });
+      });
+    })();
+
     window.$docsify = {
-      name: 'OptimusAds — Technical Test',
+      name: 'Technical Test',
       loadSidebar: true,
-      subMaxLevel: 3,
+      subMaxLevel: 0,
+      auto2top: true,
       alias: {
         '/.*/_sidebar.md': '/_sidebar.md'
       }
     }
   </script>
   <script src="//cdn.jsdelivr.net/npm/docsify/lib/docsify.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
 </body>
 </html>
