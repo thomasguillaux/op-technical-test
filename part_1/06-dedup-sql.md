@@ -14,17 +14,17 @@ QUALIFY ROW_NUMBER() OVER (
         ) = 1
 ```
 
-`QUALIFY` filters on a window function without the `SELECT ... FROM (…) WHERE rn = 1` wrapper. `ORDER BY publish_time DESC` keeps the **last** copy — both directions are defensible, and keeping the last makes this tie-break identical to the one the `MERGE` below applies, so the rule is written once and holds everywhere. **The filter must name `publish_time`, not the alias**: it is the partitioning column, and `require_partition_filter` is watching. Silver renames it to `ingestion_timestamp` once, here.
+`QUALIFY` filters on a window function without the `SELECT ... FROM (…) WHERE rn = 1` wrapper. `ORDER BY publish_time DESC` keeps the **last** copy — both directions are defensible, but keeping the last matches the tie-break the `MERGE` below applies, so one rule holds everywhere. The filter names `publish_time`, not the alias: it is the partitioning column, and `require_partition_filter` is watching. Silver renames it to `ingestion_timestamp` once, here.
 
 ## Alone, it dedups only the batch
 
-**Duplicates arrive up to an hour late, and Silver runs every 30 minutes, so a duplicate and its original usually land in *different runs*.** The window function sees one batch only: in the common case it finds nothing to remove and inserts a row Silver already holds. Silver counts twice, Gold sums it, and the dashboard is quietly wrong. Removing duplicates **against what is already in Silver** takes a `MERGE ON event_id`.
+Duplicates arrive up to an hour late and Silver runs every 30 minutes, so a duplicate and its original usually land in *different runs*. The window function sees one batch: usually it finds nothing to remove, and inserts a row Silver already holds. Silver counts twice, Gold sums it, the dashboard is quietly wrong. Deduplicating against Silver's existing rows takes a `MERGE ON event_id`.
 
-That does not make the window function optional. **BigQuery rejects a `MERGE` whose source contains duplicate keys:** `UPDATE/MERGE must match at most one source row for each target row`. So the two are not alternatives — **the window function makes the `MERGE` legal, and the `MERGE` makes the dedup correct.**
+That does not make the window function optional: BigQuery rejects a `MERGE` whose source contains duplicate keys — `UPDATE/MERGE must match at most one source row for each target row`. **The window function makes the `MERGE` legal, and the `MERGE` makes the dedup correct.**
 
 ## One model, not one per source
 
-Payloads differ by source, and converging them is a stated objective. So the typing step cannot be one JSON path per field: `price` lives at `$.bid.cpm` for one SSP and `$.price_usd` for another.
+Payloads differ by source and converging them is a stated objective, so the typing step cannot be one JSON path per field: `price` lives at `$.bid.cpm` for one SSP and `$.price_usd` for another.
 
 | Option | Why not |
 |---|---|
@@ -32,7 +32,7 @@ Payloads differ by source, and converging them is a stated objective. So the typ
 | **One SQLX model per source, unioned** | Correct output, and the `MERGE`, the watermark, the rejects boundary and the assertions get copy-pasted N times. A fix to dedup has to land in every copy, and the fifth one gets missed |
 | **One model, a declarative mapping, expanded at compile time** | **Chosen** |
 
-The mapping is a JavaScript object in the Dataform repository, expanded into `CASE source_id` branches **at compile time**. Nothing evaluates it at runtime; BigQuery receives ordinary SQL.
+The mapping is a JavaScript object in the Dataform repository, expanded into `CASE source_id` branches at compile time. Nothing evaluates it at runtime: BigQuery receives ordinary SQL, identical to the hand-written version, so **adding a source is a data change instead of a code change** at no execution cost.
 
 ```js
 // includes/sources.js — the whole source contract, in one reviewable file
@@ -55,13 +55,11 @@ const col = (name, type) => `CASE source_id\n` + Object.entries(SOURCES).map(([s
 ).join("\n") + `\nEND`;
 ```
 
-> **Why this is worth the cleverness, in one line:** *the runtime SQL is identical to the hand-written version, so we pay no execution cost and take no execution risk — what we buy is that adding a source is a data change instead of a code change.*
+Onboarding an SSP becomes a diff of the mapping alone; the shared model is untouched, so an onboarding cannot break it, and *"which sources report a bid floor?"* is answered by one file rather than five models.
 
-**Onboarding an SSP becomes a reviewable diff of the thing that actually varies** — the dedup, the enrichment, the rejects boundary and the assertions are untouched, so an onboarding cannot break them. It also makes convergence auditable: *"which sources report a bid floor?"* is one file, not five models.
+The abstraction is also disposable: delete the helper, paste the generated `CASE` blocks into the model, and the compiled SQL, the cost and the results are identical. *A fallback that costs nothing is the test of whether an abstraction is safe to add.*
 
-**The retreat, stated up front, because *"this is over-engineered"* is the fair challenge.** Delete the helper and paste the generated `CASE` blocks into the model. The compiled SQL, the cost and the results are unchanged; we lose auditability and gain nothing. **The fallback is free, which is the test of whether an abstraction is safe to add.**
-
-`emits` is the second half of the mapping, and it exists for a worse failure than a missing column: an SSP with no impression beacon shows real bids against **zero** impressions, which reads as inventory won and never served rather than as a gap. So a metric a source cannot report is `NULL`, never `0`, and Gold carries the coverage counts from bullet 2.1.
+`emits` covers whole event types: a source with no impression beacon reports `NULL` impressions, never `0`, because zero reads as inventory won and never served rather than as a gap.
 
 ## What actually runs
 
@@ -149,29 +147,53 @@ WHEN MATCHED AND s.ingestion_timestamp > t.ingestion_timestamp THEN UPDATE SET
 WHEN NOT MATCHED THEN INSERT ROW;
 ```
 
-## Five choices worth pointing at
+## Five choices inside the `MERGE`
 
 **Every read is bounded above by `batch_max`, not only below by the watermark.** Bronze grows while the run executes, so an open-ended predicate means the three statements read three different tables. The upper bound makes them one batch, and stops the watermark advancing past rows the `MERGE` never saw.
 
-**`t.auction_day IN UNNEST(batch_days)` sits in the `ON` clause, not in a subquery.** That line *is* the partition pruning. Put it anywhere BigQuery cannot evaluate before the scan and pruning stops silently: results stay correct, only the bill changes. Silver has no expiration, so the unpruned alternative scans a table that grows forever.
+**`t.auction_day IN UNNEST(batch_days)` sits in the `ON` clause, not in a subquery.** That line *is* the partition pruning. Anywhere BigQuery cannot evaluate it before the scan, pruning stops silently: results stay correct, only the bill changes — and Silver has no expiration, so the unpruned scan grows forever.
 
 **`batch_days` is read from the data, not assumed to be "today and yesterday".** A backfill three days old targets its own partition automatically; a hardcoded window would scan the wrong partitions *and* miss the duplicates it was meant to catch.
 
-**`auction_day` is absent from the `UPDATE SET` on purpose.** A duplicate whose auction day moved is not a duplicate — it is the producer re-stamping on retry while reusing `event_id`. Updating the column would move the row to another partition and hide that bug, so it stays out and the anomaly stays visible to the quality job. `auction_hour` *is* updated, because it derives from a value that should never have changed.
+**`auction_day` is absent from the `UPDATE SET`.** A duplicate whose auction day moved is not a duplicate — it is the producer re-stamping on retry while reusing `event_id`. Updating the column would move the row to another partition and hide that bug; leaving it out keeps the anomaly visible to the quality job. `auction_hour` *is* updated, because it derives from a value that should never have changed.
 
-**`SAFE_CAST` plus `WHERE y.auction_timestamp IS NOT NULL` is the rejects boundary.** A companion `INSERT` writes the excluded rows with their raw payload to `silver_rejects`. **That table carries a 7-day expiration**, because it holds raw payloads and therefore sits on the wrong side of the anonymisation boundary.
+**`SAFE_CAST` plus `WHERE y.auction_timestamp IS NOT NULL` is the rejects boundary.** A companion `INSERT` writes the excluded rows with their raw payload to `silver_rejects`, which expires after 7 days: raw payloads sit on the wrong side of the anonymisation boundary.
 
 ## A watermark, saved two minutes behind the ceiling
 
-`WHERE publish_time > watermark` reads every Bronze row ingested since the last **successful** run. A fixed lookback, say 3 hours, has no catch-up mode: a backlog draining on Sunday arrives outside every following window and is skipped for good. The watermark states the rule more simply — *process everything not yet processed* — so a two-day backlog runs the same code as a two-minute one.
+`WHERE publish_time > watermark` reads every Bronze row ingested since the last *successful* run. A fixed lookback, say 3 hours, has no catch-up mode: a backlog draining on Sunday arrives outside every following window and is skipped for good. The watermark's rule — *process everything not yet processed* — runs a two-day backlog with the same code as a two-minute one.
 
-This is safe **because `publish_time` is stamped by the platform**. But *stamped in order* and *appear in order* are different claims, and only the first is true:
+`publish_time` is stamped by the platform. But *stamped in order* and *appear in order* are different claims, and only the first is true:
 
 > **A message stamped 10:29:58 becomes queryable at 10:30:04.** The subscription writes Bronze in parallel, so the order rows are *stamped* is not the order they *appear*. The 10:30 Silver run had already read; the highest stamp it saw was 10:29:59. Had that become the new line, the 10:29:58 row would have sat behind it forever — merged by nothing, counted by nothing, and no job would have failed.
 
-So the line is saved **two minutes behind `batch_max`**, and every run re-reads the last two minutes of the previous one. **The `MERGE` throws the repeats away — that is the job it already does** — so the overlap costs scan and nothing else: \~7% of the Bronze read. *Failure has to land in the direction of doing work twice, never in the direction of skipping it.*
+```mermaid
+flowchart TB
+  subgraph st["publish_time — the order Pub/Sub stamps"]
+    direction LR
+    S1["1st stamped<br/>10:29:58"]
+    S2["2nd stamped<br/>10:29:59"]
+  end
+  subgraph vis["Queryable in Bronze — the order rows appear"]
+    direction LR
+    V2["1st visible<br/>10:29:59"]
+    V1["2nd visible<br/>10:29:58"]
+  end
+  S1 --> V1
+  S2 --> V2
+  V2 --> M["the 10:30 run reads<br/>batch_max = 10:29:59"]
+  V1 -. "lands after the run has read" .-> M
+  M --> BAD["line saved at batch_max<br/>10:29:58 sits behind it forever<br/>and no job fails"]
+  M --> GOOD["line saved 2 min behind batch_max<br/>the next run re-reads it<br/>the MERGE discards the repeat"]
+  classDef bad fill:none,stroke:#c0504d,stroke-width:2px;
+  classDef ok fill:none,stroke:#2e8b57,stroke-width:2px;
+  class BAD bad;
+  class GOOD ok;
+```
 
-The watermark lives in a table, `pipeline_state`, one row per model — not in a `SELECT MAX(...) FROM ${self()}`. That `MAX` is over a non-partitioned column on a table with `require_partition_filter = TRUE`, so **BigQuery refuses to run it**, and a row makes the watermark *settable*: *"reprocess from Tuesday"* is an `UPDATE` rather than a code change.
+The overlap costs scan and nothing else: \~7% of the Bronze read. Failure lands in the direction of doing work twice, never of skipping it.
+
+The watermark lives in a table, `pipeline_state`, one row per model, not in a `SELECT MAX(...) FROM ${self()}`: that `MAX` is over a non-partitioned column on a table with `require_partition_filter = TRUE`, so BigQuery refuses to run it. A row also makes the watermark *settable* — *"reprocess from Tuesday"* is an `UPDATE`, not a code change.
 
 ## Day-scoped dedup is a trade, not an oversight
 
@@ -179,7 +201,7 @@ The watermark lives in a table, `pipeline_state`, one row per model — not in a
 
 1. Silver holds `event_id = X` at `auction_day = D4`
 2. The producer retries X and re-stamps the auction clock into D5. `batch_days = [D5]`
-3. The `ON` clause looks for X **in D5 only**, finds nothing, and `WHEN NOT MATCHED` inserts it
+3. The `ON` clause looks for X in D5 only, finds nothing, and `WHEN NOT MATCHED` inserts it
 
 ```mermaid
 flowchart TB
@@ -198,26 +220,24 @@ flowchart TB
   class Q det;
 ```
 
-**Moving to the auction's clock made this rarer, and made the alternative worse.** Re-stamping `event_timestamp` on retry is plausible producer behaviour — the beacon fires again, "now" is a new value. Re-stamping `auction_timestamp` means altering an attribute the producer is *carrying* rather than *generating*, which is a considerably stranger bug. Meanwhile, closing the gap inside the `MERGE` means dropping the partition filter and matching every run against the entire history of Silver — a table with **no expiration**, so that scan grows without bound and would be paid 48 times a day forever, to defend against a bug in someone else's code.
+Bucketing on the auction's clock keeps this rare: re-stamping `event_timestamp` on retry is plausible — the beacon fires again, "now" is a new value — but `auction_timestamp` is an attribute the producer *carries*, not one it *generates*. Closing the gap inside the `MERGE` costs the partition filter: every run then matches against the whole history of Silver, a table with no expiration, 48 times a day, to defend against a bug in someone else's code.
 
-So it is closed by **detection instead of prevention**: the quality job counts the `event_id`s appearing with more than one `auction_timestamp`. Zero in steady state; non-zero means a producer is re-stamping, and the repair is a targeted rebuild of the two days involved. **The rule the whole design runs on: being wrong must be visible and rerunnable, not impossible.** A limit we have priced and instrumented is not the same as one we did not notice.
+So it is closed by detection instead of prevention: the quality job counts the `event_id`s appearing with more than one `auction_timestamp`. Zero in steady state; non-zero means a producer is re-stamping, and the repair is a targeted rebuild of the two days involved. **Being wrong must be visible and rerunnable, not impossible.**
 
 ## Midnight is not an edge case — it is impossible
 
-The obvious question: an event at 23:59:59 whose duplicate arrives after midnight. Do they land in different partitions and miss each other?
-
-No, and under `auction_day` the case cannot arise. `auction_timestamp` is identical on all five events of an auction by construction, so **an auction cannot straddle midnight no matter when its impression fires.** Partitioning on each event's own clock would make midnight merely *survivable*; the auction's clock removes the case.
+An event at 23:59:59 whose duplicate arrives after midnight: different partitions, missed match? Under `auction_day`, no — `auction_timestamp` is identical on all five events of an auction by construction, so **an auction cannot straddle midnight no matter when its impression fires**. Partitioning on each event's own clock would make midnight merely *survivable*; the auction's clock removes the case.
 
 ## Rejected — one line each
 
 | Option | Why not |
 |---|---|
-| **Window function alone** | Limited to one batch. The duplicate usually arrives in a later run than the original, so in the common case it removes nothing |
+| **Window function alone** | Limited to one batch. The duplicate usually arrives in a later run than the original, so it removes nothing |
 | **`MERGE` alone, no window function** | Illegal: BigQuery refuses a source with duplicate keys, `UPDATE/MERGE must match at most one source row for each target row` |
 | **`SELECT DISTINCT` / `GROUP BY event_id`** | No tie-break rule, and no way to express "keep the later copy" |
-| **`ORDER BY publish_time ASC` (keep first)** | Defensible, but then the batch rule and the `MERGE` rule disagree, and that disagreement only shows on a row that arrived twice |
+| **`ORDER BY publish_time ASC` (keep first)** | Defensible, but the batch rule and the `MERGE` rule then disagree, and only on a row that arrived twice |
 | **A wall-clock ceiling — `CURRENT_TIMESTAMP()` at the start of the run** | Simpler, and wrong: a message stamped before the ceiling can surface after it and land behind the line. A ceiling read from the data is a value we have seen; a clock reading is a prediction |
-| **Dataform's native incremental model** | `SELECT MAX(ingestion_timestamp) FROM ${self()}` is refused outright by `require_partition_filter`, and it makes the watermark unsettable for a backfill |
+| **Dataform's native incremental model** | `SELECT MAX(ingestion_timestamp) FROM ${self()}` is refused outright by `require_partition_filter`, and the watermark becomes unsettable for a backfill |
 | **Dedup at ingest, before Bronze** | Needs \~10 GB of live keyed state on the hot path to hold a 1h window at 23k/s, and lets duplicates through *silently* when that state is lost, where the `MERGE` fails loudly and can be rerun |
 | **A fixed 3h read window** | No catch-up: a draining backlog is skipped for good, and only the numbers show it |
 | **Partition filter in a subquery instead of the `ON` clause** | Same results, no pruning: the failure is invisible except on the bill |
