@@ -85,11 +85,10 @@ flowchart LR
   class O,S ok;
 ```
 
-**`gold_opportunity`** — `day × publisher_id × ad_unit_id × format × device × channel`
-`auctions` · `auctions_with_bid` · `responses` · `bids` · `wins` · `impressions` · `gross_revenue` · `publisher_payout`
-
-**`gold_ssp`** — `day × publisher_id × ad_unit_id × ssp_id × format × device × channel`
-`bids` · `no_bids` · `wins` · `impressions` · `gross_revenue` · `publisher_payout`
+| Table | Grain | Measures |
+|---|---|---|
+| **`gold_opportunity`** | `day, publisher_id, ad_unit_id, format, device, channel` | `auctions`, `auctions_with_bid`, `responses`, `bids`, `wins`, `impressions`, `gross_revenue`, `publisher_payout` |
+| **`gold_ssp`** | `day, publisher_id, ad_unit_id, ssp_id, format, device, channel` | `bids`, `no_bids`, `wins`, `impressions`, `gross_revenue`, `publisher_payout` |
 
 The weak argument for two tables is *"measures at different grains belong in different fact tables"*. It is standard Kimball, and it invites the reply *"then aggregate the SSP dimension away"*. The strong argument: **each table has a denominator the other cannot express.**
 
