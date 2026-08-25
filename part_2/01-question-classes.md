@@ -61,6 +61,22 @@ m₁ - m₀  =  Σᵢ w₁ᵢ·(r₁ᵢ - r₀ᵢ)     ← rate effect
          +  Σᵢ r₀ᵢ·(w₁ᵢ - w₀ᵢ)     ← mix effect
 ```
 
+<table>
+<tr><td>
+
+**Worked example — same drop, opposite cause.** Desktop 60% of traffic @ $10 eCPM, mobile 40% @ $5: blended eCPM $8.00.
+
+| | Day 0 | Day 1, mix shift | Day 1, rate drop |
+|---|---|---|---|
+| Desktop | 60% @ $10 | 40% @ $10 | 60% @ $8 |
+| Mobile | 40% @ $5 | 60% @ $5 | 40% @ $5 |
+| Blended eCPM | $8.00 | **$7.00** | **$6.80** |
+
+Same-sized drop, two different causes: shares moved and no rate changed (mix), or shares held and desktop's own rate fell (rate). A ranking by "eCPM down $X" cannot tell these apart — only the split can.
+
+</td></tr>
+</table>
+
 **Exact.** The contributions sum to the total change, so this is an attribution and not a ranking, with no residual to hand-wave. It runs **one dimension at a time, never a cross product** — `ssp_id`, `ad_unit_id`, `device`, `channel`, in `v_ssp_*` and `v_opportunity_*` — and reports the one whose top contributors explain the most of the change.
 
 **4 — Materiality floor.** A segment with 200 impressions can show a 300% eCPM swing and top the ranking. Segments below 1% of the period's denominator are **collapsed into `other`**, not dropped — so the contributions still sum to the total.
