@@ -36,7 +36,7 @@ A text-to-SQL agent writes one query, gets one number, and narrates a cause — 
 
 Routines only answer questions someone anticipated. *"Which ad units on mobile lost fill rate after we dropped SSP X"* is a shape nobody scripted and exactly what a Yield analyst asks on a Tuesday — every new shape becomes a ticket. And it answers around the named deliverable, a Text-to-SQL + RAG pattern. **One routine, not a library.**
 
-## The routing objection
+## The routing objection — enforced by the API, not the prompt
 
 *"Is this a what or a why?"* is itself a model judgement, exposed to the same drift. **Misrouting degrades an answer; it does not falsify one** — a *why* sent to `run_query` returns one number and a visible under-answer, not a confident wrong cause. **And the routing is enforced by the API, not asked for in the prompt:** `tool_config.function_calling_config.mode = ANY` with `allowed_function_names` — the section Google's docs title *"Forced function calling"* — constrains the model to a named subset, so a turn narrowed to `diagnose_change` cannot come back as free SQL. *A prompt asks; `mode = ANY` refuses the alternative.*
 
