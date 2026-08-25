@@ -4,7 +4,7 @@ OptimusAds monetizes ad inventory for media publishers through header bidding.
 
 This file is the shared glossary: business vocabulary only. No architecture, no schemas, no implementation.
 
-**No design decisions either.** A term belongs here only if it would mean the same thing under a completely different architecture. Anything we *chose* lives in `docs/design_decisions/` — a decision parked in the glossary reads as a given and stops being grilled.
+**No design decisions either.** A term belongs here only if it would mean the same thing under a completely different architecture. Anything we *chose* lives in the write-up — a decision parked in the glossary reads as a given and stops being grilled.
 
 ## Supply side
 
@@ -48,7 +48,7 @@ Bid and No-bid are the two possible SSP responses, one per SSP invited. They are
 
 One ad slot therefore produces a small cluster of Events sharing an `auction_id` — the Auction, one response per invited SSP, and, if the inventory sold, a Win and an Impression.
 
-Whether each Event carries its Auction's context or merely references the Auction is a modelling decision, not a domain fact — see [incoming-data.md](docs/design_decisions/incoming-data.md).
+Whether each Event carries its Auction's context or merely references the Auction is a modelling decision, not a domain fact — see [2.1 Medallion Model](/part_1/04-medallion-model.md).
 
 **Auction lifecycle bound** — an Auction reaches its final state within **one hour** of its first Bid. A Win or Impression may reach the stream after the rest of its Auction, but never later than that.
 
@@ -110,7 +110,7 @@ They work on **two rhythms**, and they are different instruments rather than two
 
 **Day** — the UTC calendar day, everywhere. An Event's day is the day it *happened*, not the day it reached us; the one-hour lifecycle bound caps how far those can diverge.
 
-**Hour** — the UTC clock hour. An Auction belongs to the Hour it **opened**, and every Event of that Auction belongs to the same one — including a Win or Impression that fires after the Hour has closed. This is a convention rather than a decision only in the sense that the alternative was considered and rejected; the argument is in [gold.md](docs/design_decisions/gold.md).
+**Hour** — the UTC clock hour. An Auction belongs to the Hour it **opened**, and every Event of that Auction belongs to the same one — including a Win or Impression that fires after the Hour has closed. This is a convention rather than a decision only in the sense that the alternative was considered and rejected; the argument is in [2.1 Medallion Model](/part_1/04-medallion-model.md).
 
 **Settled** — an Hour is settled once no further Events for it can arrive: the lifecycle bound and the duplicate-arrival bound have both elapsed. An Hour that has closed on the clock is not yet settled, and the two are routinely confused.
 
@@ -120,4 +120,4 @@ They work on **two rhythms**, and they are different instruments rather than two
 
 **Anonymous** — for this pipeline's purposes: carrying no field that identifies a person, and no key that can be linked back to one. **Pseudonymous is not anonymous while a re-linking key still exists** — which is why the boundary is defined by what the raw layer retains, not only by what the aggregated layer contains.
 
-**Currency** — SSPs report prices in their own currency. A single reporting currency is used everywhere the business sees a figure. *Where* in the pipeline conversion happens is a decision, not a convention — see [silver.md](docs/design_decisions/silver.md).
+**Currency** — SSPs report prices in their own currency. A single reporting currency is used everywhere the business sees a figure. *Where* in the pipeline conversion happens is a decision, not a convention — see [2.1 Medallion Model](/part_1/04-medallion-model.md).
