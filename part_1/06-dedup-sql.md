@@ -39,7 +39,7 @@ END AS price
 
 `${col("price", "NUMERIC")}` in the script below is the template call that emits exactly that. Nothing evaluates it at runtime: BigQuery receives ordinary SQL, identical to the hand-written version. Adding a source is a data change instead of a code change, at no execution cost.
 
-A source with no path for a field, or no beacon for a whole event type, yields `NULL` there and never `0`. Zero reads as inventory won and never served, rather than as a gap.
+A source with no path for a field, or no beacon for a whole event type, yields `NULL` there and never `0`.
 
 ## What actually runs
 
