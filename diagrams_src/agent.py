@@ -83,4 +83,5 @@ with Diagram(
 
     v3 >> DENIED >> raw
 
-    v_opp >> Edge(label="answer + the SQL, shown", color="darkgreen") >> analyst
+    v_opp >> Edge(label="rows", color="darkgreen") >> model
+    model >> Edge(label="answer + the SQL, shown", color="darkgreen") >> analyst

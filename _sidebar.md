@@ -13,3 +13,6 @@
     - [2.2 Bronze Partitioning & Clustering](/part_1/05-bronze-partitioning.md)
     - [2.3 Deduplication, Bronze → Silver](/part_1/06-dedup-sql.md)
 - [Part 2 — LLM Agent](/part2-llm-agent.md)
+  - AI Agent Architecture
+    - [1.1 Copilot Scope & Question Classes](/part_2/01-question-classes.md)
+    - [1.2 User → Orchestrator → Model → BigQuery](/part_2/02-agent-flow.md)
