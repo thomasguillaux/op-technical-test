@@ -16,9 +16,11 @@ One stateless `POST` per question, and a loop that runs at most twice: the model
 | 4 | Gemini → tool call | A name and arguments on `response.function_calls` — the model chooses *what* to ask, and writes no SQL on three of the four tools | — |
 | 5 | Validator | `run_query` only: parse, single `SELECT`, allowlist, mandatory date predicate — our code, ahead of the client | ms |
 | 6 | Dry run | `run_query` only: bytes-to-be-scanned returned by the engine without executing | < 1 s |
-| 7 | Execute against the semantic views | The job carries `maximum_bytes_billed`; the service account holds `SELECT` on the semantic-layer dataset alone | 1–3 s |
+| 7 | Execute against the semantic views | **Every** job carries `maximum_bytes_billed`, the fixed routines included — they take model-chosen arguments even though we wrote their SQL; the service account holds `SELECT` on the semantic-layer dataset alone | 1–3 s |
 | 8 | Result → model | `Part.from_function_response(...)` appended to `contents`; the loop returns to hop 3 | ms |
-| 9 | Narration → analyst | Prose, with the executed SQL and the rows it returned beside it | ~1–2 s |
+| 9 | Narration → FastAPI → analyst | Four fields on the same `POST`: the prose, the executed SQL, the rows, and the period's quality verdict | ~1–2 s |
+
+**Hop 9 is a contract, not a page.** The surface that renders those four fields is out of scope — the test's flow runs from the user to BigQuery and back, and no choice of client changes a decision anywhere in Part 2. **Checkability is a property of what comes back, not of how it is drawn:** 1.1 grants the model free-form SQL on the argument that a wrong number gets caught, and what makes it catchable is the number arriving next to the query that produced it and the verdict on whether the period was even settled.
 
 ## Orchestrator — own loop, not LangChain
 
@@ -56,7 +58,9 @@ Google's Conversational Analytics API went **GA for BigQuery on 2026-06-23** and
 
 **Table selection is documented as not being a security control.** Verbatim: *"Table selection isn't a security setting. Even if you specify that the data source can only pull information from certain tables — like table1 and table2 — the system might still return data from an unintended table (table3) if the user running the query has general permissions."* The test asks how a hallucination is stopped from reading terabytes of raw data. The product documents that its scoping does not answer that; hop 7's service account does.
 
-Buying wins for an organisation already on Looker, or without an engineer to own a prompt-and-validator stack. Not here — they are hiring the engineer.
+Buying wins for an organisation without an engineer to own a prompt-and-validator stack. Not here — they are hiring the engineer.
+
+**An existing BI estate does not change that, and Looker is the case worth stating.** Conversational Analytics in Looker is GA and genuinely good on the *what* class — grounded in LookML, enforcing its joins, filters and permissions. But Google documents it as not supporting *"questions that can only be answered with prediction, forecasting, correlation, or anomaly detection"*, and **attribution is exactly what the test's example asks for**. Its steering primitives are custom instructions and default filters — authored constraints, the same advisory-not-enforced objection as above. *A tool already paid for is still not a tool that answers the question.*
 
 ## Rejected — one line each
 
@@ -66,8 +70,9 @@ Buying wins for an organisation already on Looker, or without an engineer to own
 | **Vertex AI Agent Runtime** (ex Agent Engine) | Managed hosting, sessions and memory for a stateless single-turn call with four tools; also pins the service to Python |
 | **Google ADK** | The same objection one layer closer to Google: a framework above a call we make in one line |
 | **Conversational Analytics API** | GA and genuinely close. Loses on the two documented facts above |
-| **Looker + LookML** | A BI platform bought to obtain a semantic layer, for ten users and a handful of views |
+| **Looker + LookML**, even already in place | Its agent is documented as not supporting correlation questions — the test's own example. And reaching LookML from our loop means the Open SQL Interface: `SELECT` only, no `JOIN`, and the job runs on Looker's connection, leaving nothing of ours to carry the dry run, the ceiling or the grant |
 | **Streaming model tokens to the user** | The answer is checkable only once the SQL and numbers arrive with it; a streamed narration is read before either exists |
+| **A custom web UI for the ten analysts** | A fifth component in a four-participant flow, serving a cross-check the four response fields already carry |
 
 ---
 
