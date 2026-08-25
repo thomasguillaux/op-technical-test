@@ -19,7 +19,7 @@ That checks the objects twice, once against our parse and once against BigQuery'
 
 **3 — `maximum_bytes_billed`.** A query estimated above it fails without incurring a charge, returning `Query exceeded limit for bytes billed: … or higher required.` Layers 1 and 2 are code we wrote and could get wrong; this one holds if both do.
 
-Set on every job the orchestrator issues, not only on `run_query`. Layers 1 and 2 rightly skip `diagnose_change` and `resolve_entity` — their SQL is ours, and re-parsing our own statements against our own allowlist tests nothing a unit test does not. Their *scope* is still the model's: it picks `period` and `filters`, and a year-long period makes correct fixed SQL scan twenty months of every publisher. On the free-SQL path the ceiling bounds a statement the model wrote. On the fixed path, it bounds the arguments the model chose.
+Set on every job the orchestrator issues, not only on `run_query`. Layers 1 and 2 rightly skip `diagnose_change` and `resolve_entity` — their SQL is ours, and re-parsing our own statements against our own allowlist tests nothing a unit test does not. Their *scope* is still the model's: it picks `period` and `filters`, and a year-long period makes correct fixed SQL scan twenty-four months of every publisher. On the free-SQL path the ceiling bounds a statement the model wrote. On the fixed path, it bounds the arguments the model chose.
 
 **4 — IAM, the grant argued in 3.1.** The only layer that does not depend on any code of ours being right.
 
@@ -79,8 +79,8 @@ def execute(sql: str, client: bigquery.Client, params=None):
         query_parameters=params or [],
     )).result()
 
-def run_query(sql: str, client: bigquery.Client):
-    validate(sql)                                     # layers 1-2: model-written SQL only
+def run_query(sql: str, client: bigquery.Client):     # layers 1-2: model-written SQL only
+    validate(sql)
 
     dry = client.query(sql, bigquery.QueryJobConfig(dry_run=True, use_query_cache=False))
     for t in dry.referenced_tables:                   # the engine's resolution, not our parse

@@ -18,7 +18,7 @@ The view never exposes `ecpm` as a stored column, so there is nothing to average
 
 ## Gold stores only additive measures
 
-`gross_revenue`, `publisher_payout`, `impressions`, `auctions`, `responses`, `wins`. Never `ecpm`, never `fill_rate`, never `gross_margin`. The test for it:
+`gold_opportunity` stores `auctions`, `auctions_with_bid`, `responses`, `bids`, `wins`, `impressions`, `gross_revenue`, `publisher_payout`; `gold_ssp` stores `bids`, `no_bids`, `wins`, `impressions`, `gross_revenue`, `publisher_payout`. Never `ecpm`, never `fill_rate`, never `gross_margin`. The test for it:
 
 > **If adding two rows together does not produce a meaningful number, it does not belong in the table.**
 
