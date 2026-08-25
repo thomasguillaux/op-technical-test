@@ -20,7 +20,7 @@ One stateless `POST` per question, and a loop that runs at most twice: the model
 | 8 | Result → model | `Part.from_function_response(...)` appended to `contents`; the loop returns to hop 3 | ms |
 | 9 | Narration → analyst | Prose, with the executed SQL and the rows it returned beside it | ~1–2 s |
 
-## Orchestrator — the choice the test's wording hides
+## Orchestrator — own loop, not LangChain
 
 The test offers *"LangChain or FastAPI"*. Those are not alternatives: LangChain is a framework, FastAPI is the HTTP layer. **The real choice is LangChain inside FastAPI against our own loop inside FastAPI** — that loop is hops 3 to 8, about fifty lines against one provider.
 
@@ -48,7 +48,7 @@ Parallel function calling — several calls in one turn, no documented flag to d
 
 **Cost.** BigQuery bytes dominate per question, not tokens, and the ceiling at hop 7 bounds the worst case, not the average. Context caching is not a lever: the minimum cacheable prefix for the Gemini 3 family is 4,096 tokens, below which the dictionary block sits.
 
-## Build vs buy — the Conversational Analytics API
+## Build vs buy — build: the API can't force the guardrail
 
 Google's Conversational Analytics API went **GA for BigQuery on 2026-06-23** and now carries most of this page: `big_query_max_billed_bytes`, IAM scoping, audit logging, a Knowledge Catalog glossary with synonyms, the generated SQL and reasoning steps shown, custom BigQuery routines registered as `user_functions.bqRoutines`, and semantically matched example queries. That closes most of the gap; two things survive.
 
