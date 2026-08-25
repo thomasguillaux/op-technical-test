@@ -44,53 +44,93 @@ DECLARE batch_days ARRAY<DATE>;
 -- No row yet is a first run: seed at Bronze's own 7-day window, never NULL.
 SET watermark = COALESCE(
   (SELECT last_success FROM pipeline_state WHERE model = 'silver_events'),
-  TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY));
+  TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+);
 
--- A ceiling read from the data and fixed for the run, so every statement below sees one
--- batch rather than successive snapshots of a table that grows while we work.
-SET batch_max = (SELECT MAX(publish_time) FROM bronze_events WHERE publish_time > watermark);
-IF batch_max IS NULL THEN RETURN; END IF;         -- an empty batch is a valid outcome
+SET batch_max = (
+  SELECT MAX(publish_time)
+  FROM bronze_events
+  WHERE publish_time > watermark
+);
 
--- The only pass over `payload` in the run. Nothing after this line reads it again.
+IF batch_max IS NULL THEN
+  RETURN;  -- an empty batch is a valid outcome
+END IF;
+
 CREATE TEMP TABLE batch AS
 WITH deduped AS (
-  SELECT * EXCEPT (publish_time), publish_time AS ingestion_timestamp
+  SELECT
+    * EXCEPT (publish_time),
+    publish_time AS ingestion_timestamp
   FROM bronze_events
-  WHERE publish_time > watermark AND publish_time <= batch_max
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY publish_time DESC) = 1
-), typed AS (
-  SELECT event_id, event_type, source_id, publisher_id, ingestion_timestamp,
-         ${col("auction_timestamp", "TIMESTAMP")} AS auction_timestamp,
-         ${col("price", "NUMERIC")}               AS price, …
-  FROM deduped                                    -- one ${col(…)} per typed column
-)
-SELECT                                            -- silver_events' columns, in its order
-  event_id, event_type, source_id, publisher_id, ingestion_timestamp, auction_timestamp,
-  DATE(auction_timestamp)                  AS auction_day,     -- Silver's partition key
-  TIMESTAMP_TRUNC(auction_timestamp, HOUR) AS auction_hour,    -- Gold's grain
-  CURRENT_TIMESTAMP() AS job_insert_timestamp,    -- kept on UPDATE, set on INSERT
-  CURRENT_TIMESTAMP() AS job_update_timestamp,    -- rewritten on both
-  … ,                                             -- the remaining typed columns
-  gross_revenue, publisher_payout                 -- from the FX / revenue-share joins of 2.1
-FROM typed;   -- plus the LEFT JOINs to ref_fx_rate and ref_revenue_share of 2.1
+  WHERE publish_time > watermark
+    AND publish_time <= batch_max
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY event_id
+    ORDER BY publish_time DESC
+  ) = 1
+),
 
--- The auction days actually present. A script variable, not a subquery: BigQuery prunes on
--- a value fixed before the statement runs, never on a predicate it still has to evaluate.
-SET batch_days = (SELECT ARRAY_AGG(DISTINCT auction_day IGNORE NULLS) FROM batch);
+typed AS (
+  SELECT
+    event_id,
+    event_type,
+    source_id,
+    publisher_id,
+    ingestion_timestamp,
+    ${col("auction_timestamp", "TIMESTAMP")} AS auction_timestamp,
+    ${col("price", "NUMERIC")}               AS price,
+    ${col("currency", "STRING")}             AS currency,
+    …                                        -- one ${col(…)} per typed column
+  FROM deduped
+)
+
+SELECT
+  t.event_id,
+  t.event_type,
+  t.source_id,
+  t.publisher_id,
+  t.ingestion_timestamp,
+  t.auction_timestamp,
+  DATE(t.auction_timestamp)                  AS auction_day,          -- Silver's partition key
+  TIMESTAMP_TRUNC(t.auction_timestamp, HOUR) AS auction_hour,         -- Gold's grain
+  CURRENT_TIMESTAMP()                        AS job_insert_timestamp, -- kept on UPDATE, set on INSERT
+  CURRENT_TIMESTAMP()                        AS job_update_timestamp, -- rewritten on both
+  …,                                                                  -- the remaining typed columns
+  IF(t.event_type = 'impression', t.price * fx.rate,                      NULL) AS gross_revenue,
+  IF(t.event_type = 'impression', t.price * fx.rate * rs.publisher_share, NULL) AS publisher_payout
+FROM typed AS t
+LEFT JOIN ref_fx_rate AS fx
+  ON  fx.currency = t.currency
+  AND fx.day      = DATE(t.auction_timestamp)
+LEFT JOIN ref_revenue_share AS rs
+  ON  rs.publisher_id = t.publisher_id
+  AND DATE(t.auction_timestamp) BETWEEN rs.valid_from AND rs.valid_to;
+
+SET batch_days = (
+  SELECT ARRAY_AGG(DISTINCT auction_day IGNORE NULLS)
+  FROM batch
+);
 
 MERGE INTO silver_events AS t
-USING (SELECT * FROM batch WHERE auction_timestamp IS NOT NULL) AS s  -- else silver_rejects
+USING (
+  SELECT * FROM batch WHERE auction_timestamp IS NOT NULL
+) AS s
 ON  t.event_id    = s.event_id
-AND t.auction_day IN UNNEST(batch_days)           -- 1-2 partitions, never the whole table
-WHEN MATCHED AND s.ingestion_timestamp > t.ingestion_timestamp THEN UPDATE SET
-  ingestion_timestamp = s.ingestion_timestamp, auction_hour = s.auction_hour,
-  … ,                                             -- every column but the two omitted:
-  job_update_timestamp = s.job_update_timestamp   -- auction_day and job_insert_timestamp
-WHEN NOT MATCHED THEN INSERT ROW;
+AND t.auction_day IN UNNEST(batch_days)
 
--- Then, both keyed the same way and for the same reason: silver_rejects (the rows the
--- WHERE above excluded — keys and a reason, never a payload) and pipeline_state, below.
-DROP TABLE batch;   -- a multi-statement query's temp table otherwise lingers 24 hours
+WHEN MATCHED AND s.ingestion_timestamp > t.ingestion_timestamp THEN
+  UPDATE SET
+    ingestion_timestamp  = s.ingestion_timestamp,
+    auction_hour         = s.auction_hour,
+    …,
+    job_update_timestamp = s.job_update_timestamp
+
+WHEN NOT MATCHED THEN
+  INSERT ROW;
+
+-- silver_rejects and pipeline_state writes follow, keyed the same way, below.
+DROP TABLE batch;  -- a multi-statement query's temp table otherwise lingers 24 hours
 ```
 
 ## Four choices inside the run
