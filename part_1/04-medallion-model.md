@@ -6,10 +6,8 @@
 |---|---|---|---|
 | **Rule** | Accepts everything, validates nothing | Types, deduplicates, **anonymises**, applies anything that can later change | Aggregates to the grain the business asks its questions in |
 | **Grain** | One row per message | One row per event, deduplicated on `event_id` | One row per **hour** × dimensions |
-| **Shape** | Typed envelope + opaque `payload` JSON | \~26 typed columns, no residual JSON | Two fact tables + a quality table |
+| **Shape** | Typed envelope + opaque `payload` JSON | \~21 typed columns, no residual JSON | Two fact tables + a quality table |
 | **Partition / cluster** | `TIMESTAMP_TRUNC(publish_time, HOUR)` / `publisher_id, ssp_id, event_type` | `auction_day` / `publisher_id, event_type, ad_unit_id` | `DATE(auction_hour)` / `publisher_id, ad_unit_id` (+ `ssp_id`) |
-| **Retention** | **7 days** | **Indefinite** | Indefinite |
-| **Personal data** | **Yes** — the only layer that holds it | No | No |
 | **Consumer** | Reprocessing, and the DE team | The DE team, operationally | BI, and the Part 2 copilot — through views |
 
 ## Bronze — accepts everything, validates nothing
@@ -31,7 +29,7 @@ Silver is typed wide, and the retention rule forces it. A narrow Silver is corre
 | `source_id` | STRING | no | Drives the per-source mapping in 2.3 |
 | `publisher_id` | STRING | no | Envelope |
 | `ingestion_timestamp` | TIMESTAMP | no | Pub/Sub `publish_time`; the `MERGE` tie-break |
-| `auction_timestamp` | TIMESTAMP | no | The auction's clock — stamped once by the wrapper, echoed by all five events |
+| `auction_timestamp` | TIMESTAMP | no | The auction's clock — stamped once by the wrapper, echoed by every event of the auction |
 | `auction_day` | DATE | no | `DATE(auction_timestamp)` — *partition key* |
 | `auction_hour` | TIMESTAMP | no | `TIMESTAMP_TRUNC(auction_timestamp, HOUR)` — Gold's grain |
 | `job_insert_timestamp` | TIMESTAMP | no | When this pipeline first wrote the row |
@@ -41,10 +39,6 @@ Silver is typed wide, and the retention rule forces it. A narrow Silver is corre
 | `ad_unit_id` | STRING | yes | |
 | `ssp_id` | STRING | yes | Null on `auction` — an auction has no single SSP |
 | `format`, `device`, `channel` | STRING | yes | display/video/native · device class · prebid/direct |
-| `country`, `placement_position` | STRING | yes | *Typed wide* — no metric uses them today |
-| `bid_floor` | NUMERIC | yes | *Typed wide* — the obvious next yield question |
-| `deal_id` | STRING | yes | *Typed wide* — programmatic guaranteed vs open auction |
-| `is_winner` | BOOL | yes | Null on `auction` |
 | `price`, `currency` | NUMERIC, STRING | yes | As reported |
 | `gross_revenue` | NUMERIC | yes | `price` converted to the reporting currency |
 | `publisher_payout` | NUMERIC | yes | `gross_revenue` × the publisher's share for that day |
@@ -63,7 +57,7 @@ This is free rather than clever. The semantic layer requires every stored measur
 
 At daily grain this barely matters. At hourly grain it is the decision the tier rests on: an auction opening at 09:58 whose impression renders at 10:02 puts its denominator in one hour and its numerator in the next, so every ratio is wrong in both, in opposite directions. Flow attribution's defence is that the errors cancel under steady traffic — but a deploy is a step change, the one condition where inflow and outflow are not equal, so **flow breaks precisely in the scenario the hourly tier was requested for.**
 
-So every event counts in the hour its *auction* opened, read from `auction_hour`, and a fill rate for 09:00 means *"of the opportunities opened at 09:00, how many filled"*. That rests on one property: the Prebid wrapper stamps `auction_timestamp` once, when the auction opens, and all five events echo it — an attribute the producer *carries*, never one each source *generates*. Integrations report it at different paths, which is why 2.3 maps it per source; none of them invent it.
+So every event counts in the hour its *auction* opened, read from `auction_hour`, and a fill rate for 09:00 means *"of the opportunities opened at 09:00, how many filled"*. That rests on one property: the Prebid wrapper stamps `auction_timestamp` once, when the auction opens, and every event of the auction echoes it — an attribute the producer *carries*, never one each source *generates*. Integrations report it at different paths, which is why 2.3 maps it per source; none of them invent it.
 
 ### `is_settled` — published, not left to the reader
 
@@ -71,7 +65,7 @@ Cohort attribution costs one thing: an hour is not final when it closes. Each ho
 
 > `is_settled` — a Silver run has succeeded **whose watermark on `publish_time` has passed `auction_hour + 2h`**.
 
-Two hours because the auction lifecycle is bounded at one and its events publish within seconds. The watermark, not the wall clock, is what makes it safe: during a drain the watermark lags, so hours stay unsettled until the data is genuinely in, where a clock rule would declare an hour final while the outage that emptied it was still draining. Each row also carries `sources_total` and `sources_reporting_impressions`, publishing the same kind of verdict: an SSP with no impression beacon contributes real bids and no impressions, which reads as inventory won and never served rather than as a measurement that is missing. So a metric a source cannot report is `NULL`, never `0`, and `SAFE_DIVIDE` propagates it until the ratio refuses to render.
+Two hours because the auction lifecycle is bounded at one — its events publish within seconds — and a retry lands at most an hour after the original. The watermark, not the wall clock, is what makes it safe: during a drain the watermark lags, so hours stay unsettled until the data is genuinely in, where a clock rule would declare an hour final while the outage that emptied it was still draining. Each row also carries `sources_total` and `sources_reporting_impressions`, publishing the same kind of verdict: an SSP with no impression beacon contributes real bids and no impressions, which reads as inventory won and never served rather than as a measurement that is missing. So a metric a source cannot report is `NULL`, never `0`, and `SAFE_DIVIDE` propagates it until the ratio refuses to render.
 
 ### Two fact tables, because there are two denominators
 
@@ -83,11 +77,6 @@ The obvious design is one fact table at SSP grain. It cannot hold `auctions`, th
 | **`gold_ssp`** | `auction_hour, publisher_id, ad_unit_id, ssp_id, format, device, channel` | `bids`, `no_bids`, `wins`, `impressions`, `gross_revenue`, `publisher_payout` |
 
 `responses` is bids + no_bids across every SSP invited — demand depth per opportunity, readable without joining `gold_ssp`. Both tables also carry `is_settled` and the two coverage counts, and both partition by `DATE(auction_hour)`: daily partitions holding hourly rows, because hourly ones would put 8,760 a year against BigQuery's 10,000-partition ceiling, on a table retained indefinitely.
-
-| Table | Denominator | The question only it answers |
-|---|---|---|
-| `gold_opportunity` | `auctions` | *What share of our inventory sold?* — including auctions nobody bid on, which is exactly the unsold inventory the Yield team exists to fix |
-| `gold_ssp` | `bids + no_bids` for that SSP | *Of the auctions SSP X was invited to, how often did it respond and win?* — in other words, is X worth keeping |
 
 > **An analyst asks why SSP 7's fill rate looks catastrophic.** It isn't. SSP 7 is invited to 4% of auctions, so measured against every opportunity it looks like it never delivers; measured against the auctions it was invited to, it performs fine. A single fact table keyed by SSP gives only the first number, and the decision that number drives is *"drop SSP 7"*.
 
@@ -109,10 +98,6 @@ Every dimension — `publisher_id`, `ad_unit_id`, `ssp_id`, `format`, `device`, 
 
 | Option | Why not |
 |---|---|
-| **A single Gold fact table at SSP grain** | Cannot express `auctions`; forces either a 10-20× opportunity overcount or a placeholder row every query must remember |
-| **Two independently built tables, or daily stored and hourly derived** | Two jobs computing the same measures eventually disagree with nobody able to say which is right — and an hour cannot be recovered from a day |
-| **Flow attribution — each event in its own hour** | Splits an auction across two buckets, breaking every ratio in both. Its defence fails exactly at a deploy, which is what the hourly tier is for |
-| **Dimension tables / a star schema in Gold** | Saves bytes a columnar store already saves, and buys a join every consumer can get wrong — the copilot included. The one time-varying attribute is versioned in Silver before Gold sees it |
 | **A self-join on `auction_id` to find the auction hour** | Correct, and a three-day shuffle on every hourly run. Denormalising `auction_timestamp` makes it a column read |
 | **Holding unsettled hours back from publication** | Throws away real data to hide incompleteness. `is_settled` labels it instead |
 | **Change detection on `ingestion_timestamp`** | Reads a clock Pub/Sub owns, so a row Silver wrote late lands behind Gold's line and its day is never rebuilt — silently, inside the window meant to repair it |

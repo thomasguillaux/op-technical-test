@@ -25,7 +25,7 @@ OPTIONS (
 -- Dataset-level options: neither is a table property.
 ALTER SCHEMA bronze SET OPTIONS (
   max_time_travel_hours = 48,        -- BigQuery's minimum
-  storage_billing_model = 'LOGICAL'  -- physical bills the expiry residue; Silver's dataset is PHYSICAL
+  storage_billing_model = 'LOGICAL'  -- physical bills the expiry residue
 );
 ```
 
@@ -56,7 +56,7 @@ Block pruning cannot rescue daily grain, and the reason is our own DDL: BigQuery
 
 Two of the three columns the test wants fast are cluster keys. The partition answers the third.
 
-**On Bronze, arrival time *is* event date, within one measured hour.** An auction reaches its final state within an hour and a retry lands at most an hour after the original, so every event dated D arrives between D 00:00 and D+1 01:00 — 25 hourly partitions for a 24-hour day, 4% more than the day itself. At daily grain the same query needs two partitions, 100% more. The bound is measured hourly and per publisher, so if lateness worsens the arrival range widens by exactly the measured amount and nothing else moves.
+**On Bronze, arrival time *is* event date, within two measured hours.** An auction reaches its final state within an hour and a retry lands at most an hour after the original, so every event dated D arrives between D 00:00 and D+1 02:00 — 26 hourly partitions for a 24-hour day, 8% more than the day itself. At daily grain the same query needs two partitions, 100% more. Lateness is measured hourly and per publisher, so if it worsens the arrival range widens by exactly the measured amount and nothing else moves.
 
 Beyond that, event-date analysis belongs in Silver, partitioned on `auction_day` = `DATE(auction_timestamp)`. Two date columns, one per job: Bronze needs a clock no publisher can skew, Silver a business meaning stable across every event of one auction.
 
@@ -68,7 +68,7 @@ BigQuery clustering is *prefix-ordered* — rows sort by the first key, then by 
 |---|---|---|
 | 1 | `publisher_id` | \~300 values, and every operational or reprocessing query names one |
 | 2 | `ssp_id` | The test's own second key; the natural filter for a demand-side investigation |
-| 3 | `event_type` | 5 values — the biggest bulk filter (`no_bid` is 75-80% of volume) but the coarsest |
+| 3 | `event_type` | 5 values — the biggest bulk filter (`bid` + `no_bid` are 75-80%) but the coarsest |
 
 **`event_type` is last, even though it removes the most rows.** Putting a 5-value column first would sort every block by the coarsest key there is, weakening the two filters the test named. Behind the prefix it still contributes block pruning to any query that also filters `publisher_id`.
 
@@ -78,7 +78,7 @@ BigQuery clustering is *prefix-ordered* — rows sort by the first key, then by 
 
 `partition_expiration_days = 7` makes retention a table property rather than a job that can be scheduled wrong or quietly paused, and `max_time_travel_hours = 48` is BigQuery's minimum — Bronze is immutable and the GCS archive is the recovery path, so a longer window only pays to keep a rollback of data we are obliged to delete.
 
-`storage_billing_model = 'LOGICAL'` is the one option here that goes against the reflex. Physical bills compressed bytes and wins past 2:1, which this data clears at \~3.4:1 — but physical *also* bills time-travel and fail-safe bytes, and an expiring table keeps paying for them: 7 live days plus 2 more of time travel plus a fixed 7 of fail-safe is \~16 days of bytes for a 7-day table, which moves the break-even to \~4.6:1. **Physical storage is a bet on compression that an expiring table loses.** Silver's dataset takes the opposite setting, because nothing there expires.
+`storage_billing_model = 'LOGICAL'` goes against the reflex. Physical bills compressed bytes and wins past 2:1, which this data clears at \~3.4:1 — but it *also* bills time-travel and fail-safe bytes, \~16 days for a 7-day table, which moves the break-even to \~4.6:1. **Physical storage is a bet on compression that an expiring table loses.**
 
 **Cost.** Every figure above is bytes scanned at on-demand \$6.25/TiB. A reservation prices slot-time instead and is the lever to revisit above \~450 TiB/month sustained, where 100 Standard slots running continuously buy the same bytes — below it, on-demand costs nothing when idle and gives the Part 2 agent its own slot pool for the price of its own project.
 
@@ -86,10 +86,6 @@ BigQuery clustering is *prefix-ordered* — rows sort by the first key, then by 
 
 | Option | Why not |
 |---|---|
-| **Partitioning on the producer's timestamp** | Gives the partition key to the producer: one skewed clock opens a partition years in the future and breaks both retention and pruning |
-| **Promoting `event_date` as a Bronze column** | Impossible on this path: the subscription writes what was published, there is no compute in between, and a `DATE` cast is exactly the failure Bronze must not own |
-| **Daily partitioning** | Every 30-minute Silver run scans the whole day so far: \~$6,100/month against \~$1,000. Block pruning cannot save it, because clustering spreads `publish_time` |
-| **`event_type` as the first cluster key** | Sorts every block by a 5-value column, weakening the two keys the test named |
 | **No `require_partition_filter`** | Leaves a 10.5 TB unfiltered scan one typo away on Bronze — and an unbounded one on Silver |
 | **A BigQuery Editions reservation** | Probably cheaper on the pipeline side, and isolating the Part 2 agent then costs a second reservation to size and maintain, where on-demand isolates it with a project. Revisit above \~450 TiB/month |
 

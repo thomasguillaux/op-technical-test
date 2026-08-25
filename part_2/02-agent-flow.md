@@ -20,15 +20,13 @@ One stateless `POST` per question, and a loop that runs at most twice: the model
 | 8 | Result → model | `Part.from_function_response(...)` appended to `contents`; the loop returns to hop 3 | ms |
 | 9 | Narration → FastAPI → analyst | Four fields on the same `POST`: the prose, the executed SQL, the rows, and the period's quality verdict | ~1–2 s |
 
-**Hop 9 is a contract, not a page.** The surface that renders those four fields is out of scope — the test's flow runs from the user to BigQuery and back, and no choice of client changes a decision anywhere in Part 2. **Checkability is a property of what comes back, not of how it is drawn:** 1.1 grants the model free-form SQL on the argument that a wrong number gets caught, and what makes it catchable is the number arriving next to the query that produced it and the verdict on whether the period was even settled.
-
 ## Orchestrator — own loop, not LangChain
 
 The test offers *"LangChain or FastAPI"*. Those are not alternatives: LangChain is a framework, FastAPI is the HTTP layer. **The real choice is LangChain inside FastAPI against our own loop inside FastAPI** — that loop is hops 3 to 8, about fifty lines against one provider.
 
 LangChain v1 shipped 2025-10-22 and `create_agent` runs on the LangGraph runtime; its `wrap_tool_call` middleware receives a tool call *before* execution, and returning a `ToolMessage` without invoking `handler` rejects it. **So LangChain can hold the guardrail seam**; claiming otherwise is a strawman.
 
-**The objection is a dependency one.** We own the seam either way; one of the two ways is a framework whose agent entry point moved packages inside a year — `AgentExecutor` now ships in a separate `langchain-classic` package, `create_agent` is the supported path. This is the same argument that rejects Dataflow, Composer, dbt Core and Cube: *a runtime we operate, placed between us and something we could call directly.*
+**The objection is a dependency one.** We own the seam either way; one of the two ways is a framework whose agent entry point moved packages inside a year — `AgentExecutor` now ships in a separate `langchain-classic` package, `create_agent` is the supported path. This is the argument that removed Dataflow, Composer and dbt Core in Part 1, and Cube and a vector database alongside LangChain in Part 2: *a runtime we operate, placed between us and something we could call directly.*
 
 ## The model call, concretely
 
@@ -38,7 +36,7 @@ Pass Python callables to the SDK and it enables *automatic function calling*: th
 
 Parallel function calling — several calls in one turn, no documented flag to disable it — means every call is answered before hop 3 runs again.
 
-**No model ID is pinned:** Flash tier, function calling, a 12-month availability class. IDs churn — `gemini-2.5-flash` retires 2026-10-20. (Vertex AI is now the Gemini Enterprise Agent Platform, renamed at Cloud Next '26; the endpoint and the `vertexai=True` flag are unchanged.)
+**No model ID is pinned:** Flash tier, function calling, a 12-month availability class. IDs churn — `gemini-2.5-flash` retires 2026-10-20.
 
 ## Text-to-SQL + RAG, located in the flow
 
@@ -52,7 +50,7 @@ Parallel function calling — several calls in one turn, no documented flag to d
 
 ## Build vs buy — build: the API can't force the guardrail
 
-Google's Conversational Analytics API went **GA for BigQuery on 2026-06-23** and now carries most of this page: `big_query_max_billed_bytes`, IAM scoping, audit logging, a Knowledge Catalog glossary with synonyms, the generated SQL and reasoning steps shown, custom BigQuery routines registered as `user_functions.bqRoutines`, and semantically matched example queries. That closes most of the gap; two things survive.
+Google's Conversational Analytics API went **GA for BigQuery on 2026-06-23** and now carries most of this page: `big_query_max_billed_bytes`, IAM scoping, custom BigQuery routines registered as `user_functions.bqRoutines`, and semantically matched example queries. That closes most of the gap; two things survive.
 
 **Nothing makes the routine mandatory.** The docs say a registered routine is used *"if they're needed"* and that a matched example query *"might"* be executed; our loop's `mode = ANY` with `allowed_function_names` (1.1) removes the choice. No mechanism for forcing it is documented, and every steering primitive the docs describe is advisory. Removing model choice on the uncatchable question class is the design; an agent product sells the opposite.
 
@@ -60,16 +58,12 @@ Google's Conversational Analytics API went **GA for BigQuery on 2026-06-23** and
 
 Buying wins for an organisation without an engineer to own a prompt-and-validator stack. Not here — they are hiring the engineer.
 
-**An existing BI estate does not change that, and Looker is the case worth stating.** Conversational Analytics in Looker is GA and genuinely good on the *what* class — grounded in LookML, enforcing its joins, filters and permissions. But Google documents it as not supporting *"questions that can only be answered with prediction, forecasting, correlation, or anomaly detection"*, and **attribution is exactly what the test's example asks for**. Its steering primitives are custom instructions and default filters — authored constraints, the same advisory-not-enforced objection as above. *A tool already paid for is still not a tool that answers the question.*
-
 ## Rejected — one line each
 
 | Option | Why not |
 |---|---|
-| **LangChain v1 / LangGraph** | `wrap_tool_call` can hold the seam, so this is a dependency argument, not a capability one: a framework over a fifty-line loop |
 | **Vertex AI Agent Runtime** (ex Agent Engine) | Managed hosting, sessions and memory for a stateless single-turn call with four tools; also pins the service to Python |
 | **Google ADK** | The same objection one layer closer to Google: a framework above a call we make in one line |
-| **Conversational Analytics API** | GA and genuinely close. Loses on the two documented facts above |
 | **Looker + LookML**, even already in place | Its agent is documented as not supporting correlation questions — the test's own example. And reaching LookML from our loop means the Open SQL Interface: `SELECT` only, no `JOIN`, and the job runs on Looker's connection, leaving nothing of ours to carry the dry run, the ceiling or the grant |
 | **Streaming model tokens to the user** | The answer is checkable only once the SQL and numbers arrive with it; a streamed narration is read before either exists |
 | **A custom web UI for the ten analysts** | A fifth component in a four-participant flow, serving a cross-check the four response fields already carry |

@@ -23,8 +23,6 @@ Dataform publishes them to BigQuery on every build. `INFORMATION_SCHEMA.COLUMN_F
 
 > `gross_revenue` — *"what the inventory earned before OptimusAds' share. Also asked as: what a publisher makes, what a site earns, turnover, top line."*
 
-**A synonym and the definition it belongs to cannot be edited apart**, and neither reaches the prompt without the reviewer of the SQL having seen it.
-
 ## *"Make us"* is ambiguous, and no dictionary fixes it
 
 Read literally, *"how much does site Y make **us**"* is net revenue — OptimusAds' retained share. The analyst almost always means gross, what the publisher's inventory earned. **A synonym list cannot resolve that, because both readings are correct English and only one is intended.**
@@ -73,8 +71,8 @@ LIMIT 5
 
 | Option | Why not |
 |---|---|
-| **Vector database** | A vector store is the right answer when the corpus outgrows the context window, and ours does not — a few dozen definitions, a few thousand tokens. The client removed the last case for one: *"pas de texte libre, que des données liées aux enchères"*, so every field is an enumeration or a number and **semantic search has nothing to search.** If the dictionary ever does outgrow the window, BigQuery's own `VECTOR_SEARCH` is the answer, not a separate database — the rule that removed every other standalone runtime |
-| **A data catalog** | The product the test names is gone: **Data Catalog was discontinued on 2026-06-01**, its successor renamed **Knowledge Catalog** in April 2026. More to the point, a catalog is a governance and discovery surface for *humans* at 200 tables and 40 analysts, where nobody holds the model in their head. **The LLM does not read a catalog:** something would have to export it into the prompt, which makes it an authoring tool for the dictionary rather than a replacement for it. And Dataform already publishes column descriptions into it, so it sits *downstream* of the SQLX |
+| **Vector database** | The client removed the last case for one: *"pas de texte libre, que des données liées aux enchères"*, so every field is an enumeration or a number and **semantic search has nothing to search.** If the dictionary ever does outgrow the context window, BigQuery's own `VECTOR_SEARCH` is the answer, not a separate database — the rule that removed every other standalone runtime |
+| **A data catalog** | A catalog is a governance and discovery surface for *humans* at 200 tables and 40 analysts, where nobody holds the model in their head. **The LLM does not read a catalog:** something would have to export it into the prompt, which makes it an authoring tool for the dictionary rather than a replacement for it. And Dataform already publishes column descriptions into it, so it sits *downstream* of the SQLX |
 | **dbt tags** | Dead with the dbt runtime, removed in Part 1. Dataform column descriptions are the equivalent and sit closer to the SQL |
 | **A vector index over entity names** | A copy of a dimension table, with a staleness problem the dimension table does not have |
 | **A hand-maintained synonym table** | A second source of truth for vocabulary, in a system that does not fail when it drifts from the first |

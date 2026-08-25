@@ -6,17 +6,17 @@
 
 ## The design in ten sentences
 
-Six GCP services — Pub/Sub, Cloud Storage, BigQuery, Dataform, Cloud Logging, Cloud Monitoring — in **two shapes**: everything left of Bronze is Google-operated configuration, everything right of it is SQL on a clock.
-
-There is **no third shape** — no service we deploy, no runtime we patch, no process of ours that can fail between the publisher and the dashboard.
+Six GCP services — Pub/Sub, Cloud Storage, BigQuery, Dataform, Cloud Logging, Cloud Monitoring — in **two shapes**: everything left of Bronze is Google-operated configuration, everything right of it is SQL on a clock; **no third shape** — no service we deploy, no runtime we patch, no process of ours that can fail between the publisher and the dashboard.
 
 One topic feeds two export subscriptions in parallel: Bronze in BigQuery, and a GCS archive that has never been inside BigQuery.
 
 The hot/cold line sits at Bronze, because **the hot path can fail but cannot be wrong** — no dedup, no join, no cast, only an envelope check that refuses a message or lets it through — so every error lives on the cold path, where the repair is running the same SQL again.
 
-Raw logs are legally transient at 7 days, so the durable record is not raw: it is **Silver**, typed, anonymous and retained indefinitely.
+Raw logs are transient at 7 days, so the durable record is not raw: it is **Silver**, typed, anonymous and retained indefinitely.
 
-Bronze itself validates nothing — a typed envelope plus an opaque JSON payload, partitioned **hourly** on Pub/Sub's `publish_time`, a clock no publisher can skew, clustered on `publisher_id, ssp_id, event_type`, expiring at 7 days.
+Bronze itself validates nothing — a typed envelope plus an opaque JSON payload, partitioned **hourly** on Pub/Sub's `publish_time`, the *arrival* clock no publisher can skew, clustered on `publisher_id, ssp_id, event_type`, expiring at 7 days.
+
+An event is queryable in Bronze in seconds, in Silver within 30 minutes, and in Gold at the next hourly rebuild.
 
 Silver types, deduplicates and anonymises: a window function on `event_id` makes the `MERGE` legal, the `MERGE` makes the dedup correct across runs, and the typed schema *is* the anonymisation boundary — an allowlist fails closed where a stripping filter fails open.
 
@@ -40,7 +40,7 @@ One page per bullet of the test, in the test's order. Each page stands alone and
 
 | Page | The claim it defends |
 |---|---|
-| [**Retention & Anonymisation**](/part_1/00-retention-anonymisation.md) | Not a bullet — the client's 7-day rule reshaped six of the answers below, so it is stated once instead of six times |
+| [**Retention & Anonymisation**](/part_1/00-retention-anonymisation.md) | Not a bullet — the client's 7-day rule makes Bronze a replay buffer and Silver the source of truth |
 | [**1.1 — Architecture Diagram**](/part_1/01-architecture-diagram.md) | Two writes from one topic, not one write and a copy — and the five signals that fire while every job reports success |
 | [**1.2 — Component Justification**](/part_1/02-component-justification.md) | Pub/Sub, Cloud Storage, BigQuery kept; Dataflow and Composer rejected, each with the condition that brings it back |
 | [**1.3 — Hot/Cold Path Separation**](/part_1/03-hot-cold-separation.md) | Four repair triggers, one code path — and why a batch path must exist regardless |
