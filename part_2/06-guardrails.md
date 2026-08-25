@@ -19,6 +19,8 @@ Query quotas are the bullet's middle term and are deliberately not in this table
 
 **3 — `maximum_bytes_billed`.** A query estimated above it **fails without incurring a charge**, returning `Query exceeded limit for bytes billed: … or higher required.` Layers 1 and 2 are code we wrote and could get wrong; this one holds if both do.
 
+**Set on every job the orchestrator issues, not only on `run_query`.** Layers 1 and 2 rightly skip `diagnose_change` and `resolve_entity` — their SQL is ours, and re-parsing our own statements against our own allowlist tests nothing a unit test does not. Their *scope* is still the model's: it picks `period` and `filters`, and a year-long period makes correct fixed SQL scan twenty months of every publisher. **On the free-SQL path the ceiling bounds a statement the model wrote; on the fixed path, the arguments it chose.**
+
 **4 — IAM, the grant argued in 3.1.** The only layer that does not depend on any code of ours being right.
 
 ## The bullet's own scenario, run through the stack
@@ -41,7 +43,7 @@ BigQuery's custom quotas close it. **`QueryUsagePerUserPerDay`** applies per use
 
 ```python
 PROJECT, DATASET = "optimusads-analytics", "semantic"
-ALLOWED = load_allowlist()           # the semantic-dataset views, "project.dataset.view"
+ALLOWED = load_allowlist()
 GOLD = f"{PROJECT}.gold"             # what those views read, and the only other dataset a job may touch
 DATE_COLS = {"auction_hour", "day"}  # the partitioning column, at either grain
 MAX_BYTES = 20 * 1024**3             # orders of magnitude above any legitimate question
@@ -71,8 +73,16 @@ def validate(sql: str) -> None:
                for w in tree.find_all(exp.Where) for c in w.find_all(exp.Column)):
         raise Rejected("a predicate on the partitioning date column is required")
 
+def execute(sql: str, client: bigquery.Client, params=None):
+    # every job the orchestrator issues lands here — free SQL and the fixed routines alike,
+    # because a routine we wrote still takes a period the model chose
+    return client.query(sql, bigquery.QueryJobConfig(
+        maximum_bytes_billed=MAX_BYTES,
+        query_parameters=params or [],
+    )).result()
+
 def run_query(sql: str, client: bigquery.Client):
-    validate(sql)
+    validate(sql)                                     # layers 1-2: model-written SQL only
 
     dry = client.query(sql, bigquery.QueryJobConfig(dry_run=True, use_query_cache=False))
     for t in dry.referenced_tables:                   # the engine's resolution, not our parse
@@ -82,12 +92,12 @@ def run_query(sql: str, client: bigquery.Client):
     if dry.total_bytes_processed > MAX_BYTES:
         raise Rejected(f"{dry.total_bytes_processed / 1024**3:.1f} GiB exceeds the ceiling")
 
-    return client.query(sql, bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES)).result()
+    return execute(sql, client)
 ```
 
 ## What the four layers do not cover
 
-**The narration is unguarded.** Even when the fixed routine returns a correct, deterministic result set, the model writes the prose describing it — and prose can misrepresent a correct table. The mitigation is already in the flow: the executed SQL and the rows shown beside the answer, which is what makes a *what* answer checkable at all.
+**The narration is unguarded.** Even when the fixed routine returns a correct, deterministic result set, the model writes the prose describing it — and prose can misrepresent a correct table. The mitigation is already in the flow: the executed SQL and the rows returned with the answer, which is what makes a *what* answer checkable at all.
 
 **None of these layers makes an answer true.** Every one of them bounds blast radius and spend. Correctness is 1.1's job, and the fact that those are two different problems is why the design splits the question classes rather than piling guardrails onto a single path.
 
