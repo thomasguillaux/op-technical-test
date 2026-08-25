@@ -6,11 +6,11 @@
 
 ## The design in ten sentences
 
-Six GCP services — Pub/Sub, Cloud Storage, BigQuery, Dataform, Cloud Logging, Cloud Monitoring — in **two shapes**: everything left of Bronze is Google-operated configuration, everything right of it is SQL on a clock; **no third shape** — no service we deploy, no runtime we patch, no process of ours that can fail between the publisher and the dashboard.
+Six GCP services (Pub/Sub, Cloud Storage, BigQuery, Dataform, Cloud Logging, Cloud Monitoring) in **two shapes**: everything left of Bronze is Google-operated configuration, everything right of it is SQL on a clock, with no third shape — no service we deploy, no runtime we patch, no process of ours that can fail between the publisher and the dashboard.
 
 One topic feeds two export subscriptions in parallel: Bronze in BigQuery, and a GCS archive that has never been inside BigQuery.
 
-The hot/cold line sits at Bronze, because **the hot path can fail but cannot be wrong** — no dedup, no join, no cast, only an envelope check that refuses a message or lets it through — so every error lives on the cold path, where the repair is running the same SQL again.
+The hot/cold line sits at Bronze, because **the hot path can fail but cannot be wrong**: no dedup, no join, no cast, only an envelope check that refuses a message or lets it through, so every error lives on the cold path, where the repair is running the same SQL again.
 
 Raw logs are transient at 7 days, so the durable record is not raw: it is **Silver**, typed, anonymous and retained indefinitely.
 
@@ -20,19 +20,19 @@ An event is queryable in Bronze in seconds, in Silver within 30 minutes, and in 
 
 Silver types, deduplicates and anonymises: a window function on `event_id` makes the `MERGE` legal, the `MERGE` makes the dedup correct across runs, and the typed schema *is* the anonymisation boundary — an allowlist fails closed where a stripping filter fails open.
 
-Gold stores **hourly** rows bucketed by the *auction's* clock, with the daily tier as a view over them, so a day is the exact sum of its 24 hours and the two tiers cannot disagree.
+Gold stores hourly rows bucketed by the *auction's* clock, with the daily tier as a view over them, so a day is the exact sum of its 24 hours and the two tiers cannot disagree.
 
 **Two fact tables, not one, because there are two denominators**: `auctions`, for what share of inventory sold, and `bids + no_bids`, for whether a given SSP is worth keeping.
 
-Dataform runs all of it — SQLX in Git, dependencies declared in the code, assertions as the quality gate — because this DAG has one system in it.
+Dataform runs all of it — SQLX in Git, dependencies declared in the code, assertions as the quality gate, because this DAG has one system in it.
 
 ## Two spines
 
-**Six components lost to the same sentence: *a runtime we operate, placed between us and something we could call directly.*** Dataflow, Composer and dbt Core here; Cube, LangChain and a vector database in Part 2. One rule applied six times is a design; six separate verdicts would be taste. Dataform's compile-time templating is not a counterexample — **a build step is not a runtime.**
+Six components lost to the same sentence: *a runtime we operate, placed between us and something we could call directly.* Dataflow, Composer and dbt Core here; Cube, LangChain and a vector database in Part 2. One rule applied six times is a design; six separate verdicts would be taste. Dataform's templating runs at compile time — **a build step is not a runtime.**
 
-**Raw data is transient; the durable record is the anonymised event layer.** The error budget moves from *we can always rebuild* to *we must be right inside 7 days, and know it* — which is why quality monitoring is load-bearing here rather than hygiene, and why the checks run hourly. A check that surfaces a problem on day 3 is a repair; the same check running weekly is an obituary.
+**Raw data is transient; the durable record is the anonymised event layer.** The error budget moves from *we can always rebuild* to *we must be right inside 7 days, and know it*. Quality monitoring is therefore load-bearing here rather than hygiene, and the checks run hourly: a check that surfaces a problem on day 3 is a repair, the same check running weekly is an obituary.
 
-**Cost.** No total on this page, and none anywhere — each page prices its own decision, so no argument rests on a figure. Worth knowing before reading further: the largest single lever in Part 1 is not a component choice. It is Bronze's partition grain, **\~$5,100/month between hourly and daily**, on one clause of DDL.
+**Cost.** No total on this page, and none anywhere — each page prices its own decision, so no argument rests on a figure. The largest single lever in Part 1 is not a component choice. It is Bronze's partition grain, **\~$5,100/month between hourly and daily**, on one clause of DDL.
 
 ## Where to go deeper
 

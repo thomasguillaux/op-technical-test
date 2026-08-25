@@ -13,29 +13,31 @@
 
 ## Catchability, and the rule it produces
 
-One question decides it: *can the person receiving the answer catch it when it is wrong?* **Catchability is a property of the question type, not the person.**
+*Can the person receiving the answer catch it when it is wrong?* Catchability is a property of the question type, not the person.
 
-**What** — a number, a ranking, a trend — is handled by `run_query`, the model writes it, because a wrong number looks wrong to someone who sees it daily; **Why** — a cause, an attribution — by `diagnose_change`, we wrote the SQL.
+**What** — a number, a ranking, a trend — is handled by `run_query`, the model writes it: a wrong number looks wrong to someone who sees it daily. **Why** — a cause, an attribution — by `diagnose_change`, we wrote the SQL.
 
-**An explanation cannot be sanity-checked.** *"SSP 3 reduced bidding on mobile video"* is specific, plausible, and unverifiable without doing the analysis the analyst delegated — and its specificity makes it *more* convincing, not less.
+An explanation cannot be sanity-checked. *"SSP 3 reduced bidding on mobile video"* is specific, plausible, and unverifiable without doing the analysis the analyst delegated. Its specificity makes it *more* convincing, not less.
 
-**And the uncatchable answer is the one people act on.** Nobody changes a floor price because revenue was €12,400; they change it because they believe SSP 3 pulled back. The class with no verification has the largest blast radius.
+The uncatchable answer is the one people act on. Nobody changes a floor price because revenue was €12,400; they change it because they believe SSP 3 pulled back. The class with no verification has the largest blast radius.
 
 ## One generated query cannot answer the test's example
 
-The case against pure text-to-SQL is not security; the guardrails of section 3 close that. It is that **the test's own example is an investigation**: the delta against D-1, a breakdown by four dimensions, a ranking, and a call on which one matters. Four or five queries and a judgement.
+The test's own example is an investigation: the delta against D-1, a breakdown by four dimensions, a ranking, and a call on which one matters. Four or five queries and a judgement. The case against pure text-to-SQL is not security; the guardrails of section 3 close that.
 
-A text-to-SQL agent writes one query, gets one number, and narrates a cause — **but nothing in the result set told it the cause.** It infers from how ad tech usually behaves and presents that as a finding: the failure mode nobody catches, on the exact question the test asked.
+A text-to-SQL agent writes one query, gets one number, and narrates a cause — but nothing in the result set told it the cause. It infers from how ad tech usually behaves and presents that as a finding: the failure mode nobody catches, on the exact question the test asked.
 
 ## Nor does a routine library
 
-Routines only answer questions someone anticipated. *"Which ad units on mobile lost fill rate after we dropped SSP X"* is a shape nobody scripted and exactly what a Yield analyst asks on a Tuesday — every new shape becomes a ticket. And it answers around the named deliverable, a Text-to-SQL + RAG pattern. **One routine, not a library.**
+Routines only answer questions someone anticipated. *"Which ad units on mobile lost fill rate after we dropped SSP X"* is a shape nobody scripted and exactly what a Yield analyst asks on a Tuesday. Every new shape becomes a ticket. And it answers around the named deliverable, a Text-to-SQL + RAG pattern. One routine, not a library.
 
 ## The routing objection — enforced by the API, not the prompt
 
-*"Is this a what or a why?"* is itself a model judgement, exposed to the same drift. **Misrouting degrades an answer; it does not falsify one** — a *why* sent to `run_query` returns one number and a visible under-answer, not a confident wrong cause. **And the routing is enforced by the API, not asked for in the prompt:** `tool_config.function_calling_config.mode = ANY` with `allowed_function_names` — the section Google's docs title *"Forced function calling"* — constrains the model to a named subset, so a turn narrowed to `diagnose_change` cannot come back as free SQL. *A prompt asks; `mode = ANY` refuses the alternative.*
+*"Is this a what or a why?"* is itself a model judgement, exposed to the same drift. Misrouting degrades an answer; it does not falsify one. A *why* sent to `run_query` returns one number and a visible under-answer, not a confident wrong cause.
 
-**What it does not constrain is argument values** — schema adherence, not semantics; a wrong `metric` gives a visibly wrong headline.
+**The routing is enforced by the API, not asked for in the prompt.** `tool_config.function_calling_config.mode = ANY` with `allowed_function_names` — the section Google's docs title *"Forced function calling"* — constrains the model to a named subset. A turn narrowed to `diagnose_change` cannot come back as free SQL.
+
+It does not constrain argument values: schema adherence, not semantics. A wrong `metric` gives a visibly wrong headline.
 
 ## The test's example, end to end
 
@@ -72,15 +74,15 @@ Same drop, two different causes: shares moved and no rate changed (mix), or shar
 </td></tr>
 </table>
 
-**Exact.** The contributions sum to the total change, so this is an attribution and not a ranking, with no residual to hand-wave. It runs **one dimension at a time, never a cross product** — `ssp_id`, `ad_unit_id`, `device`, `channel`, in `v_ssp_*` and `v_opportunity_*` — and reports the one whose top contributors explain the most of the change.
+**Exact.** The contributions sum to the total change, so this is an attribution and not a ranking, with no residual to hand-wave. It runs one dimension at a time, never a cross product: `ssp_id`, `ad_unit_id`, `device`, `channel`, in `v_ssp_*` and `v_opportunity_*`. It reports the one whose top contributors explain the most of the change.
 
-**4 — Materiality floor.** A segment with 200 impressions can show a 300% eCPM swing and top the ranking. Segments below 1% of the period's denominator are **collapsed into `other`**, not dropped — so the contributions still sum to the total.
+**4 — Materiality floor.** A segment with 200 impressions can show a 300% eCPM swing and top the ranking. Segments below 1% of the period's denominator are collapsed into `other`, not dropped — so the contributions still sum to the total.
 
-**The model receives a structured result — quality verdict, baseline used, headline, the factorisation, per-segment rate and mix — and writes the sentence. It chose what to investigate and invented no part of how.**
+The model receives a structured result: quality verdict, baseline used, headline, the factorisation, per-segment rate and mix. It writes the sentence. **It chose what to investigate and invented no part of how.**
 
 ## The honest limit
 
-**This localises a change; it does not explain it.** *"SSP 3 on video accounts for 78% of the drop, all of it rate effect"* says where the money went, not why SSP 3 changed its bidding — which lives in that SSP's systems. *A locus is checkable; a story is not.*
+**This localises a change; it does not explain it.** *"SSP 3 on video accounts for 78% of the drop, all of it rate effect"* says where the money went, not why SSP 3 changed its bidding — which lives in that SSP's systems.
 
 > *"Publisher X's eCPM dropped 20% yesterday — why?"* The routine calls `check_quality` before decomposing anything, and yesterday is flagged partial: three evening hours never arrived. There is no drop to explain. Had it skipped that step, the breakdown would have run happily and blamed whichever SSP is busiest in the evening — specific, fluent, entirely wrong.
 

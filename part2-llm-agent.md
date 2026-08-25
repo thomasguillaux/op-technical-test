@@ -8,19 +8,19 @@
 
 **One agent, four tools, our code** — a FastAPI loop on Cloud Run, Gemini, and BigQuery views.
 
-**We build anyway.** Google's Conversational Analytics API went **GA for BigQuery on 2026-06-23** and closes most of the gap; two things survive it, argued in 1.2.
+**We build anyway.** Google's Conversational Analytics API went GA for BigQuery on 2026-06-23 and closes most of the gap; two things survive it, argued in 1.2.
 
-The split that produces everything else is not *what the question is about* but **whether a wrong answer can be caught by the person receiving it**: a number can be checked against a dashboard, an explanation cannot be checked against anything.
+The split that produces everything else is not *what the question is about* but **whether a wrong answer can be caught by the person receiving it**: a number can be checked against a dashboard; an explanation cannot be checked against anything.
 
 So the model writes SQL for *what* questions and writes none of it for *why* questions — **`diagnose_change` is a fixed decomposition, and the model chooses only what to point it at.**
 
 **`diagnose_change` localises a change; it does not explain it** — *a locus is checkable; a story is not.*
 
-**Trustworthiness is a property of the pipeline, not of the prompt**: the copilot reads `is_settled` and the published quality verdict rather than judging its own input, because judging whether its input is complete is the thing an LLM is least able to do.
+The copilot reads `is_settled` and the published quality verdict rather than judging its own input, because judging whether its input is complete is the thing an LLM is least able to do. **Trustworthiness is a property of the pipeline, not of the prompt.**
 
-**The only objects the service account can name are views**, in a dataset authorized over Gold — so the largest cost control in Part 2 is not a guardrail but an IAM grant: guardrails bound the bad case, the grant bounds the normal one.
+**The only objects the service account can name are views**, in a dataset authorized over Gold. So the largest cost control in Part 2 is not a guardrail but an IAM grant. Guardrails bound the bad case; the grant bounds the normal one.
 
-**No component sits between us and something we could call directly** — no Cube, no LangChain, no vector database — which is the same sentence that removed Dataflow, Composer and dbt Core from Part 1.
+**No component sits between us and something we could call directly** — no Cube, no LangChain, no vector database. The same sentence removed Dataflow, Composer and dbt Core from Part 1.
 
 ## Where to go deeper
 
