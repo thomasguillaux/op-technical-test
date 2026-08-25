@@ -13,8 +13,6 @@
 
 Query quotas are the bullet's middle term and are deliberately not in this table: they bound a *day* of queries, not one query.
 
-**1 — Static validation.** The generated SQL is parsed, not pattern-matched. Four checks on the *shape* of a statement, all decidable before a client call.
-
 **2 — The dry run.** BigQuery returns bytes-to-be-scanned **without executing**. It also returns something better than a number: the job statistics carry **`referencedTables`, the engine's own resolved list of the objects the query reads.** Depending on how the engine expands a view, that list names the view or the Gold table behind it — so the check is written against both: every resolved object must sit in the semantic dataset or in the Gold dataset it is authorized over, and nothing else. The objects a query touches are therefore checked twice, once against our parse and once against BigQuery's own: **a parser can be wrong about what a query names; the engine cannot.**
 
 **3 — `maximum_bytes_billed`.** A query estimated above it **fails without incurring a charge**, returning `Query exceeded limit for bytes billed: … or higher required.` Layers 1 and 2 are code we wrote and could get wrong; this one holds if both do.
@@ -33,7 +31,7 @@ Query quotas are the bullet's middle term and are deliberately not in this table
 
 **A model in a retry loop is not one job, and neither is ten analysts on a bad afternoon** — a hundred queries each individually under the ceiling is a bill no layer above has looked at.
 
-BigQuery's custom quotas close it. **`QueryUsagePerUserPerDay`** applies per user and per service account, so it caps the copilot's entire day independently of the humans; **`QueryUsagePerDay`** caps the project, 200 TiB/day by default. Both are **proactive** — a query that would exceed the remaining allowance does not run, rather than running and being counted afterwards.
+BigQuery's custom quotas close it. **`QueryUsagePerUserPerDay`** applies per user and per service account, so it caps the copilot's entire day independently of the humans; **`QueryUsagePerDay`** caps the project. Both are **proactive** — a query that would exceed the remaining allowance does not run, rather than running and being counted afterwards.
 
 **They apply only under on-demand pricing.** Part 1's compute-billing choice is therefore a precondition for this guardrail, not an unrelated cost decision — and it is the same choice that makes a hallucinated heavy query fail *alone*. Under a shared BigQuery Editions reservation it takes slots from the pipeline and starves Silver's 30-minute cadence: **the copilot's blast radius stops being a bill and becomes a freshness incident, which is the materially worse failure.**
 
@@ -74,8 +72,6 @@ def validate(sql: str) -> None:
         raise Rejected("a predicate on the partitioning date column is required")
 
 def execute(sql: str, client: bigquery.Client, params=None):
-    # every job the orchestrator issues lands here — free SQL and the fixed routines alike,
-    # because a routine we wrote still takes a period the model chose
     return client.query(sql, bigquery.QueryJobConfig(
         maximum_bytes_billed=MAX_BYTES,
         query_parameters=params or [],
@@ -102,8 +98,6 @@ def run_query(sql: str, client: bigquery.Client):
 **None of these layers makes an answer true.** Every one of them bounds blast radius and spend. Correctness is 1.1's job, and the fact that those are two different problems is why the design splits the question classes rather than piling guardrails onto a single path.
 
 **Prompt injection has no surface here.** The classic vector is untrusted prose sitting in a retrieved corpus. The client's *"pas de texte libre, que des données liées aux enchères"* means there is no prose anywhere in this data — every field is an enumeration or a number. The only untrusted input is the question itself, typed by one of ten employees.
-
-> **The model returns a query with no date filter.** The validator rejects it before BigQuery is called at all. Had the parse missed it, the dry run comes back with the estimate and refuses; had that failed too, `maximum_bytes_billed` stops the job inside the engine. **Three independent layers, none of which requires the model to have behaved** — over a fourth that does not require our code to have behaved either.
 
 **Cost.** A dry run consumes no slots and is not billed, so the estimate that prevents the expensive query is itself free. The ceiling and the daily quota are insurance, not levers: they bound the worst query and the worst month, and change the bill only on the day something goes wrong. What moves the monthly total is not on this page — it is the grant in 3.1, which decides what a *normal* question scans.
 

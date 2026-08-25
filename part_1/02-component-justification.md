@@ -10,7 +10,7 @@
 | **Dataflow / Beam** | **Rejected** — condition to reinstate stated | The only work it would do is move five values from inside a JSON object to beside it |
 | **Airflow / Composer** | **Rejected** — Dataform instead | Right for a mixed DAG. This DAG has one system in it |
 
-Two components the test does not name: **Dataform**, argued below, and **Cloud Logging → Cloud Monitoring**, which exists for one reason — Dataform logs every workflow invocation and notifies no one.
+Two components the test does not name: **Dataform**, argued below, and **Cloud Logging → Cloud Monitoring**.
 
 **Six components lost to the same sentence: *a runtime we operate, placed between us and something we could call directly.*** Three here; Cube, LangChain and a vector database in Part 2. One rule applied six times is a design; six separate verdicts would be taste.
 
@@ -22,7 +22,7 @@ Two components the test does not name: **Dataform**, argued below, and **Cloud L
 | Nearline | \~$0.010 | 30 days | $0.01/GB |
 | Archive | \~$0.0012 | 365 days | $0.05/GB |
 
-*Single-region list prices.* Archive is the reflex, and its 365-day minimum is why it loses: deleting at 7 days while being billed for 365 means paying for 365 days of accumulation, forever — \~547 TB permanently on the invoice for the 10.5 TB actually held, \~$657/month against \~$210. **The cheapest per-byte class is the most expensive in practice, by \~3×**, and Standard also removes the retrieval fee on the replay the copy exists to serve. *A minimum-duration clause inverts cold-tier economics whenever retention is shorter than the minimum.*
+*Single-region list prices.* Archive is the reflex, and its 365-day minimum is why it loses: deleting at 7 days means paying for 365 days of accumulation, forever — \~547 TB permanently on the invoice for the 10.5 TB actually held, \~$657/month against \~$210. **The cheapest per-byte class is the most expensive in practice, by \~3×**, and Standard also removes the retrieval fee on the replay the copy exists to serve. *A minimum-duration clause inverts cold-tier economics whenever retention is shorter than the minimum.*
 
 **Cost.** Second export subscription \~$2,100/month plus \~$210 storage — flat, with no growth line, because the window is fixed.
 
@@ -60,14 +60,14 @@ Its three real gaps:
 | A run is skipped if the previous is still going | Silver reads everything since the last successful watermark, so the next run covers 60 minutes instead of 30, identically. A skip creates no workflow invocation and so emits no failure log — what catches it is the watermark-age monitor of bullet 1.1, which is why that monitor exists |
 | Orchestrates nothing outside BigQuery | The only work outside BigQuery is GCS replay: rare, human-initiated, a runbook rather than a schedule. The reference data Silver joins is *declared*, not loaded — external tables read in place, so nothing fetches and nothing waits |
 
-*Orchestration does exist here — dependency resolution, scheduling, release management, quality gating. It is simply not a separate product to operate.* Dataform exposes an API, so a genuinely mixed step later means adding Composer *in front of* it, not rewriting a model.
+*Orchestration does exist here — dependency resolution, scheduling, release management, quality gating. It is simply not a separate product to operate.*
 
 ## Rejected — one line each
 
 | Option | Why not |
 |---|---|
 | **Dataflow between Pub/Sub and Bronze** | A permanent runtime and its on-call, to perform a field split, at the same cost. Kept as the fallback if the producer will not supply the split |
-| **Cloud Run / GKE consumer instead** | The same objection in a cheaper package, plus the at-least-once handling the native subscription does for us |
+| **Cloud Run / GKE consumer instead** | The same objection in a cheaper package, plus the acks, retries and redeliveries the native subscription handles for us |
 | **Collector writing to BigQuery directly** | Deletes the durable buffer, turning every downstream failure into producer-side data loss |
 | **Composer / Airflow** | Right for a mixed DAG; this one has a single system in it. Kept as a future option: Dataform's API lets us add it later |
 | **dbt Core** | Its main argument is portability, and the stack is required to be single-warehouse. What remains is a Python runtime we patch, to submit SQL that BigQuery runs anyway |

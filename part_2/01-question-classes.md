@@ -15,16 +15,11 @@
 
 One question decides it: *can the person receiving the answer catch it when it is wrong?* **Catchability is a property of the question type, not the person.**
 
-| Question type | Example | Can the analyst catch a wrong answer? | Handled by |
-|---|---|---|---|
-| **What** — a number, a ranking, a trend | *"What did publisher X make yesterday?"* | **Yes.** A wrong number looks wrong to someone who sees it daily | `run_query` — the model writes it |
-| **Why** — a cause, an attribution | *"Why did their eCPM drop 20% on video?"* | **No.** There is nothing to compare an explanation against | `diagnose_change` — we wrote the SQL |
+**What** — a number, a ranking, a trend — is handled by `run_query`, the model writes it, because a wrong number looks wrong to someone who sees it daily; **Why** — a cause, an attribution — by `diagnose_change`, we wrote the SQL.
 
 **An explanation cannot be sanity-checked.** *"SSP 3 reduced bidding on mobile video"* is specific, plausible, and unverifiable without doing the analysis the analyst delegated — and its specificity makes it *more* convincing, not less.
 
 **And the uncatchable answer is the one people act on.** Nobody changes a floor price because revenue was €12,400; they change it because they believe SSP 3 pulled back. The class with no verification has the largest blast radius.
-
-*Give the model freedom precisely where a wrong answer gets caught, and remove it precisely where it does not.*
 
 ## One generated query cannot answer the test's example
 
@@ -68,11 +63,11 @@ m₁ - m₀  =  Σᵢ w₁ᵢ·(r₁ᵢ - r₀ᵢ)     ← rate effect
 
 | | Day 0 | Day 1, mix shift | Day 1, rate drop |
 |---|---|---|---|
-| Desktop | 60% @ $10 | 40% @ $10 | 60% @ $8 |
-| Mobile | 40% @ $5 | 60% @ $5 | 40% @ $5 |
-| Blended eCPM | $8.00 | **$7.00** | **$6.80** |
+| Desktop | 60% @ $10 | 36% @ $10 | 60% @ $8 |
+| Mobile | 40% @ $5 | 64% @ $5 | 40% @ $5 |
+| Blended eCPM | $8.00 | **$6.80** | **$6.80** |
 
-Same-sized drop, two different causes: shares moved and no rate changed (mix), or shares held and desktop's own rate fell (rate). A ranking by "eCPM down $X" cannot tell these apart — only the split can.
+Same drop, two different causes: shares moved and no rate changed (mix), or shares held and desktop's own rate fell (rate). A ranking by "eCPM down $X" cannot tell these apart — only the split can.
 
 </td></tr>
 </table>
@@ -87,7 +82,7 @@ Same-sized drop, two different causes: shares moved and no rate changed (mix), o
 
 **This localises a change; it does not explain it.** *"SSP 3 on video accounts for 78% of the drop, all of it rate effect"* says where the money went, not why SSP 3 changed its bidding — which lives in that SSP's systems. *A locus is checkable; a story is not.*
 
-> *"Publisher X's eCPM dropped 20% yesterday — why?"* The copilot checks the quality table before decomposing anything, and yesterday is flagged partial: three evening hours never arrived. There is no drop to explain. Had it skipped that step, the breakdown would have run happily and blamed whichever SSP is busiest in the evening — specific, fluent, entirely wrong.
+> *"Publisher X's eCPM dropped 20% yesterday — why?"* The routine calls `check_quality` before decomposing anything, and yesterday is flagged partial: three evening hours never arrived. There is no drop to explain. Had it skipped that step, the breakdown would have run happily and blamed whichever SSP is busiest in the evening — specific, fluent, entirely wrong.
 
 **Cost.** One invocation is four independent single-dimension passes over the Gold-grain semantic views for two periods — never a cross product, so work grows with the number of dimensions, not their product. Each pass reads one publisher's slice of two partitions.
 
@@ -95,12 +90,8 @@ Same-sized drop, two different causes: shares moved and no rate changed (mix), o
 
 | Option | Why not |
 |---|---|
-| **Pure text-to-SQL** | One query cannot support a causal claim; the model fills the gap with prose |
-| **Pure routine library** | Only answers anticipated shapes; every new question is a ticket |
 | **Let the model choose the dimensions** | The one judgement not checkable from the output, on the class not checkable at all |
-| **Cross-product of all dimensions** | Thousands of slices, most too small to mean anything |
 | **Recursive drill-down** | Unbounded runtime and cost, for slices the materiality floor discards anyway |
-| **Rank segments by their metric change** | Cannot distinguish rate from mix; the two have different fixes |
 | **A significance test per segment** | 2B events/day makes almost everything significant; materiality is what matters |
 | **A separate hourly routine** | Identical arithmetic at both grains — two copies, one drift |
 | **Conversational Analytics API** | No documented mechanism forces a *why* to the fixed routine. Argued in 1.2 |

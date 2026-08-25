@@ -4,16 +4,16 @@
 
 ![OptimusAds — event pipeline, ingestion to BI](../assets/architecture.png)
 
-Six GCP services — Pub/Sub, Cloud Storage, BigQuery, Dataform, Cloud Logging, Cloud Monitoring — in two shapes. Left of Bronze, Google-operated configuration: one topic and its envelope schema, two native export subscriptions, a dead-letter topic. Right of Bronze, SQL on a clock. The reference architecture for this on GCP puts Dataflow between the topic and the warehouse; **that box is absent here, and its absence is the design** — argued, with the condition that brings it back, in bullet 1.2.
+Six GCP services in two shapes. Left of Bronze, Google-operated configuration: one topic and its envelope schema, two native export subscriptions, a dead-letter topic. Right of Bronze, SQL on a clock. The reference architecture for this on GCP puts Dataflow between the topic and the warehouse; **that box is absent here, and its absence is the design** — argued, with the condition that brings it back, in bullet 1.2.
 
 ## The path, hop by hop
 
 | # | Hop | Mechanism | Latency |
 |---|---|---|---|
-| 1 | Collector → `events` topic | The producer splits the envelope: `event_id`, `source_id`, `publisher_id`, `ssp_id`, `event_type` as named STRING fields on every event, their presence enforced by the topic schema; everything else, the auction context included, stays under `payload` | seconds |
-| 2 | topic → `bronze_events` | **BigQuery export subscription.** Google stamps `publish_time` on receipt, so the partition key is a clock no publisher can skew | seconds |
-| 3 | topic → GCS raw archive | **Cloud Storage export subscription.** Standard class, 7 days. A second subscription, not a copy of Bronze: it never passes through BigQuery | seconds |
-| 4 | subscription → dead-letter topic | Two causes, both silent: BigQuery refuses the write because table and topic schema drifted apart, or `payload` does not hold valid JSON for a `JSON` column. A monitor watches depth. A message failing the *topic* schema never reaches here — the publish itself is refused, synchronously, to the producer | seconds |
+| 1 | Collector → `events` topic | The producer splits the envelope: `event_id`, `source_id`, `publisher_id`, `ssp_id`, `event_type` as named STRING fields on every event, their presence enforced by the topic schema; everything else, the auction context included, stays under `payload` | — |
+| 2 | topic → `bronze_events` | **BigQuery export subscription.** Google stamps `publish_time` on receipt, so the partition key is a clock no publisher can skew | — |
+| 3 | topic → GCS raw archive | **Cloud Storage export subscription.** Standard class, 7 days. A second subscription, not a copy of Bronze: it never passes through BigQuery | — |
+| 4 | subscription → dead-letter topic | Two causes, both silent: BigQuery refuses the write because table and topic schema drifted apart, or `payload` does not hold valid JSON for a `JSON` column. A monitor watches depth. A message failing the *topic* schema never reaches here — the publish itself is refused, synchronously, to the producer | — |
 | 5 | Bronze → Silver | **Dataform.** Read the rows between the watermark and a ceiling fixed from the data, dedupe on `event_id` with a window function, `MERGE` into `auction_day` partitions | every 30 min |
 | 6 | Silver → Gold | **Dataform.** Rebuild the days whose Silver rows changed, within a trailing 3-day window. Hourly grain | hourly |
 | 7 | Gold → semantic views → BI, and the Part 2 agent | BigQuery views, each metric formula written once; daily is a view over the hourly table. The agent reads the same views, not its own SQL over the tables | query time |
@@ -27,7 +27,7 @@ A scheduled export from Bronze to GCS would save the second export fee and place
 
 Dataform logs every workflow invocation and notifies no one, so Cloud Logging → a log-based alert in Cloud Monitoring → the team's channel is a real box on the diagram rather than decoration. That box covers a job reporting `FAILED`. **Every signal below is a way this pipeline can be wrong while every job reports success.**
 
-Two kinds, and the difference is what happens when they fire — but one delivery path, because Cloud Monitoring cannot query BigQuery. A **monitor** is a Dataform action on the quality tag whose failure reaches the same log-based alert and blocks nothing; only dead-letter depth has a native metric. So the split is dependency wiring, not two systems. A **monitor** alerts into the team's channel and stops nothing. An **assertion** is a Dataform action that fails, blocking the *Gold* rebuild and never the Silver run: a gate upstream of Silver would stall anonymisation and run the 7-day clock down on data nobody can rebuild. Dataform does not do this by default: the Gold action sets `dependOnDependencyAssertions: true`, which is what makes the block real rather than assumed.
+Two kinds, and the difference is what happens when they fire — but one delivery path, because Cloud Monitoring cannot query BigQuery. A **monitor** is a Dataform action on the quality tag whose failure reaches the same log-based alert and blocks nothing; only dead-letter depth has a native metric. So the split is dependency wiring, not two systems. An **assertion** is a Dataform action that fails, blocking the *Gold* rebuild and never the Silver run: a gate upstream of Silver would stall anonymisation and run the 7-day clock down on data nobody can rebuild. Dataform does not do this by default: the Gold action sets `dependOnDependencyAssertions: true`, which is what makes the block real rather than assumed.
 
 | Signal | Kind | Fires when | The failure it catches that a job-failure alert does not |
 |---|---|---|---|

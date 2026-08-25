@@ -14,7 +14,7 @@ SELECT AVG(ecpm) FROM gold_opportunity WHERE publisher_id = 'X'
 
 **Wrong, and it looks completely fine.** It averages thousands of rows of wildly different sizes — a row with 10 impressions weighs exactly as much as one with 10 million. The correct form is `SUM(gross_revenue) / SUM(impressions) * 1000`.
 
-The view never exposes `ecpm` as a stored column, so there is nothing to average: the model can select the metric, filter it, group by it — it cannot recompute it, because the division is never in its hands. **Averaging an average is the most common mistake in analytics and humans make it constantly**; the layer removes a foot-gun that catches everyone.
+The view never exposes `ecpm` as a stored column, so there is nothing to average: the model can select the metric, filter it, group by it — it cannot recompute it, because the division is never in its hands.
 
 ## Gold stores only additive measures
 
@@ -26,7 +26,7 @@ Revenue adds. Impressions add. eCPM does not. Every ratio is computed by the vie
 
 **And additivity over dimensions and additivity over time are the same property**, so each daily view is a `GROUP BY` over its hourly one with the *same* ratio expressions applied to the coarser sums. Those expressions live in one Dataform `includes` file that both views reference: a metric definition existing in two files is precisely the drift this layer exists to prevent.
 
-**The boundary:** `auctions_with_bid` is computed during the Gold build and not in the view, because **any count requiring per-event evaluation is destroyed by the aggregation** — once rows are summed, *"how many auctions drew zero bids"* is unrecoverable. Everywhere else, *make it additive and let the view divide* holds.
+**The boundary:** `auctions_with_bid` is computed during the Gold build and not in the view, because it needs a per-event test — did this auction draw a bid? — that no combination of the stored sums reproduces. Everywhere else, *make it additive and let the view divide* holds.
 
 ## The definitions
 
@@ -78,11 +78,7 @@ Every ratio uses `SAFE_DIVIDE`, and that interlocks with the null-never-zero rul
 
 The copilot's free-form SQL, the `diagnose_change` routine and the BI tool all read the same views. Change what eCPM means and **one view changes**; all three move together. Without it that definition is copy-pasted into every dashboard and every query and drifts silently, and the first symptom is two people quoting different numbers in a meeting.
 
-**`diagnose_change` reads the views and not the base tables, deliberately.** It is our code and it knows the arithmetic — but then eCPM is defined in two places, which agree on the day they are written and drift on the day someone changes one. The routine is a consumer like any other: **the whole argument for a shared layer collapses if the component with the most authority is the one exempted from it.**
-
-## It is what makes the guardrail argument in 1.1 hold
-
-1.1 permits model-generated SQL for *what* questions on the grounds that the analyst can cross-check the number against a dashboard they trust. **That is only true if the dashboard and the copilot compute eCPM the same way.** Point them at different definitions and the analyst sees two numbers with no way to tell which is right — and the cross-check that justified the model's freedom stops working.
+**`diagnose_change` reads the views and not the base tables, deliberately.** It is our code and it knows the arithmetic. The routine is a consumer like any other: **the whole argument for a shared layer collapses if the component with the most authority is the one exempted from it.**
 
 One rule follows from eCPM being gross — gross is the industry default and the publisher-facing number, while net is OptimusAds' own P&L and is exposed as `gross_margin` rather than as a second eCPM. **So the copilot always states the definition it used:** *"Publisher X's eCPM was €2.40 (gross revenue per thousand impressions)."* Two numbers under one name is the failure this layer exists to prevent, and one clause of the answer closes it.
 
