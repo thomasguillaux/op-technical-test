@@ -22,7 +22,9 @@ Two components the test does not name: **Dataform**, argued below, and **Cloud L
 | Nearline | \~$0.010 | 30 days | $0.01/GB |
 | Archive | \~$0.0012 | 365 days | $0.05/GB |
 
-*Single-region list prices.* Archive is the reflex, and its 365-day minimum is why it loses: deleting at 7 days means paying for 365 days of accumulation, forever — \~547 TB permanently on the invoice for the 10.5 TB actually held, \~$657/month against \~$210. **The cheapest per-byte class is the most expensive in practice, by \~3×**, and Standard also removes the retrieval fee on the replay the copy exists to serve. *A minimum-duration clause inverts cold-tier economics whenever retention is shorter than the minimum.*
+*Single-region list prices.* Standard is chosen on minimum duration, not on per-GB price. Archive is the reflex, but its 365-day minimum means deleting at 7 days still bills 365 days of accumulation, forever: \~547 TB permanently on the invoice for the 10.5 TB actually held, \~$657/month against \~$210.
+
+**The cheapest per-byte class is the most expensive in practice, by \~3×.** Standard also has no retrieval fee on the replay the copy exists to serve. Retention shorter than the minimum inverts cold-tier economics.
 
 **Cost.** Second export subscription \~$2,100/month plus \~$210 storage — flat, with no growth line, because the window is fixed.
 
@@ -40,9 +42,11 @@ Every candidate job here fails that test:
 | Per-source schema normalisation | A field-path lookup per source is a `CASE` over data BigQuery already holds |
 | PII stripping at ingest | Stripping is a denylist; a typed Silver schema is an allowlist. A new identifier an SSP starts sending next quarter passes straight through the first |
 
-The last row is the serious one — *raw is deleted in 7 days, so strip the identifiers before they land* — and it fails on the quality of the control, not on cost: a denylist enforced by a running process rather than by a table definition, where a bug destroys data on the only copy, with no undo. *The constraint that makes Dataflow look necessary is the one that makes it most dangerous.*
+The last row is the serious one: raw is deleted in 7 days, so identifiers would have to be stripped before they land.
 
-Cost does not decide it either: two native export subscriptions (\~$140/TiB) and a standard subscription plus the Storage Write API (\~$105/TiB) plus Dataflow compute overlap across the range. Operational surface decides it — a streaming job is a deployed service where a subscription is a configuration, and Beam plus SQL means two homes for business logic.
+It fails on the quality of the control, not on cost. A denylist enforced by a running process rather than by a table definition means a bug destroys data on the only copy, with no undo — the same constraint that argues for Dataflow is what makes it dangerous.
+
+The two paths overlap across the range: two native export subscriptions (\~$140/TiB) against a standard subscription plus the Storage Write API (\~$105/TiB) plus Dataflow compute. Cost does not decide it. Operational surface does — a streaming job is a deployed service where a subscription is a configuration, and Beam plus SQL means two homes for business logic.
 
 *What brings it back:* the producer refuses to emit the split. Then a streaming Dataflow job does it and nothing downstream changes. Asking their collector for a message format is not asking for analytical work — it already routes on `publisher_id` and `event_type`. Asking *SSPs* to agree on field semantics is a different ask, unavailable at any price, which is why schema convergence is solved in Silver.
 
@@ -60,7 +64,7 @@ Its three real gaps:
 | A run is skipped if the previous is still going | Silver reads everything since the last successful watermark, so the next run covers 60 minutes instead of 30, identically. A skip creates no workflow invocation and so emits no failure log — what catches it is the watermark-age monitor of bullet 1.1, which is why that monitor exists |
 | Orchestrates nothing outside BigQuery | The only work outside BigQuery is GCS replay: rare, human-initiated, a runbook rather than a schedule. The reference data Silver joins is *declared*, not loaded — external tables read in place, so nothing fetches and nothing waits |
 
-*Orchestration does exist here — dependency resolution, scheduling, release management, quality gating. It is simply not a separate product to operate.*
+Orchestration exists here: dependency resolution, scheduling, release management, quality gating. It is not a separate product to operate.
 
 ## Rejected — one line each
 

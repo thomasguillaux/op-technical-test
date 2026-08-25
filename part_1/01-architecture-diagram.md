@@ -4,7 +4,7 @@
 
 ![OptimusAds — event pipeline, ingestion to BI](../assets/architecture.png)
 
-Six GCP services in two shapes. Left of Bronze, Google-operated configuration: one topic and its envelope schema, two native export subscriptions, a dead-letter topic. Right of Bronze, SQL on a clock. The reference architecture for this on GCP puts Dataflow between the topic and the warehouse; **that box is absent here, and its absence is the design** — argued, with the condition that brings it back, in bullet 1.2.
+Six GCP services in two shapes. Left of Bronze, Google-operated configuration: one topic and its envelope schema, two native export subscriptions, a dead-letter topic. Right of Bronze, SQL on a clock. The reference architecture for this on GCP puts Dataflow between the topic and the warehouse. **That box is absent here, and its absence is the design.** Bullet 1.2 argues it and gives the condition that brings Dataflow back.
 
 ## The path, hop by hop
 
@@ -21,13 +21,21 @@ Six GCP services in two shapes. Left of Bronze, Google-operated configuration: o
 
 ## Two writes from one topic, not one write and a copy
 
-A scheduled export from Bronze to GCS would save the second export fee and place the safety copy *downstream* of the system it protects us from. Past day 7 there is no rebuild path, so a copy that has never been inside BigQuery is the only thing that survives a mistake made inside BigQuery — and because the archive subscription writes bytes and consults no schema, it also holds every message BigQuery declined, so a dead letter replays through the path already drawn rather than one invented for it.
+A scheduled export from Bronze to GCS would save the second export fee and place the safety copy *downstream* of the system it protects us from. Past day 7 there is no rebuild path. A copy that has never been inside BigQuery is the only thing that survives a mistake made inside BigQuery.
+
+The archive subscription writes bytes and consults no schema, so it also holds every message BigQuery declined. A dead letter replays through the path already drawn rather than one invented for it.
 
 ## What pages, beyond "the job failed"
 
-Dataform logs every workflow invocation and notifies no one, so Cloud Logging → a log-based alert in Cloud Monitoring → the team's channel is a real box on the diagram rather than decoration. That box covers a job reporting `FAILED`. **Every signal below is a way this pipeline can be wrong while every job reports success.**
+Cloud Logging → a log-based alert in Cloud Monitoring → the team's channel is a real box on the diagram, because Dataform logs every workflow invocation and notifies no one. That box covers a job reporting `FAILED`. **Every signal below is a way this pipeline can be wrong while every job reports success.**
 
-Two kinds, and the difference is what happens when they fire — but one delivery path, because Cloud Monitoring cannot query BigQuery. A **monitor** is a Dataform action on the quality tag whose failure reaches the same log-based alert and blocks nothing; only dead-letter depth has a native metric. So the split is dependency wiring, not two systems. An **assertion** is a Dataform action that fails, blocking the *Gold* rebuild and never the Silver run: a gate upstream of Silver would stall anonymisation and run the 7-day clock down on data nobody can rebuild. Dataform does not do this by default: the Gold action sets `dependOnDependencyAssertions: true`, which is what makes the block real rather than assumed.
+Two kinds, distinguished by what happens when they fire. One delivery path, because Cloud Monitoring cannot query BigQuery.
+
+A **monitor** is a Dataform action on the quality tag. Its failure reaches the same log-based alert and blocks nothing. Only dead-letter depth has a native metric. The split is dependency wiring, not two systems.
+
+An **assertion** is a Dataform action that fails, blocking the *Gold* rebuild and never the Silver run. A gate upstream of Silver would stall anonymisation and run the 7-day clock down on data nobody can rebuild.
+
+Dataform does not block on dependency assertions by default. The Gold action sets `dependOnDependencyAssertions: true`.
 
 | Signal | Kind | Fires when | The failure it catches that a job-failure alert does not |
 |---|---|---|---|
