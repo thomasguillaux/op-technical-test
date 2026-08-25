@@ -14,9 +14,11 @@ Requirements only, never mechanisms. A line belongs here only if it stays true u
 | **Freshness**         | Bronze continuous. Silver ≤30 min stale. **Two Gold aggregations: hourly, to watch a release land; daily, to follow trends.** D-1 must always be correct.                     | **Confirmed**                                                       |
 | **Retention**         | **Raw logs are kept 7 days. The aggregation anonymises the data.** A ceiling we do not control, binding every copy of the raw record.                                                                  | **Confirmed** |
 | **Users**             | \~10 people, all seeing all publishers — **no entitlement scoping, so no row-level security to design.**                                | Given                                                               |
-| **Rhythm**            | Two rhythms, not two resolutions of one need. *Look at yesterday, act today* is trend work. *Ship, then watch* is episodic: nobody stares at an hourly chart, but on a deploy day the closed hour is read within minutes.                                         | **Confirmed**                                                               |
+| **Rhythm**            | Two rhythms, not two resolutions of one need. *Look at yesterday, act today* is trend work. *Ship, then watch* is episodic: nobody stares at an hourly chart, but on a deploy day the closed hour is read within minutes.                                         | Derived                                                               |
 
 **Four of these are confirmed rather than assumed** — the aggregation grain, the schema variance, the payload content, and the retention rule — because each one moves the design far enough that guessing at it would be guessing at the answer.
+
+**The rhythm line is derived, not quoted.** They asked for two grains; the reading of *why* is ours, and it is what makes the hourly tier a cohort with a settlement flag rather than a faster daily table.
 
 **The retention answer is the one that reaches furthest.** Raw data is transient, so the durable record is the anonymised event layer — and the error budget moved from *we can always rebuild* to *we must be right inside 7 days, and know it*. That is [the first page of Part 1](/part_1/00-retention-anonymisation.md).
 

@@ -2,70 +2,45 @@
 
 > *"Raw logs are kept 7 days. Aggregation anonymises the data."*
 
-Two sentences, two obligations:
+Not a test bullet — one client rule that reshapes six of the answers below. 7 days is a ceiling, and it binds every *copy* of the raw record rather than the one in BigQuery. Whatever outlives it must be anonymous, and aggregation is named as the anonymising step, so the line between *deletable* and *durable* is a layer in the pipeline rather than a policy document.
 
-1. 7 days is a ceiling, not a budget. It cannot be paid around, and it binds *every* copy of the raw record — not only the one in BigQuery.
-2. Whatever survives past day 7 must be anonymous. Aggregation is named as the anonymising step, so the boundary between *deletable* and *durable* is a layer in the pipeline, not a policy document.
-
-## One principle, four figures
-
-> Pay indefinitely for the copy that cannot be recreated. Pay the shortest useful window for every copy that can.
-
-| Layer | Retention | Recreatable from | Why that figure |
-|---|---|---|---|
-| **GCS raw archive** | 7 days | nothing | Ceiling. The rule binds the record, not the store |
-| **Bronze** | 7 days | nothing, past day 7 | Ceiling — and therefore the reprocessing window, by force |
-| **Silver** | Indefinite | nothing, past day 7 | Anonymous, therefore allowed to persist. The only remaining record at event grain |
-| **Gold** | Indefinite | Silver | Aggregated and small, so retention is not a cost question |
-
-**The instinct is that raw is the irreplaceable copy and must be kept longest. Under this rule it is the reverse.** Raw is legally transient, so the irreplaceable copy is the first layer *allowed* to persist.
-
-**Which means the medallion convention — Bronze is the source of truth — does not hold here.** The source of truth is Silver; Bronze is a landing and replay buffer whose window is set by law rather than by us.
-
-Why Silver and not Gold, which is anonymous, aggregated and far smaller:
-
-> Gold's dimension combinations are fixed at design time. Silver's are not fixed until query time.
-
-Ask Gold for *fill rate by device on one ad unit during a specific incident* and the answer does not exist and cannot be derived — the rows were already collapsed.
+**The instinct is that raw is the irreplaceable copy and must be kept longest. Under this rule it is the reverse:** raw is legally transient, so the irreplaceable copy is the first layer *allowed* to persist. **Which means the medallion convention — Bronze is the source of truth — does not hold here.** Silver is the source of truth, anonymous and retained indefinitely; Bronze is a landing and replay buffer whose window is set by law rather than by us.
 
 ## The anonymisation boundary is Silver
 
-Bronze is too early: it exists to reject nothing and inspect nothing, and stripping fields there means parsing the payload at ingest — putting back the processing component bullet 1.2 deletes. Gold is too late: Silver is retained indefinitely, so an identifier that reaches Silver persists indefinitely. That leaves Silver, where the mechanism is that the typed schema does not have those columns.
+Bronze is too early: stripping fields there means parsing the payload at ingest, which puts back the processing component bullet 1.2 deletes. Gold is too late: Silver is retained indefinitely, so an identifier that reaches Silver persists indefinitely. That leaves Silver, where the mechanism is that the typed schema does not have those columns — an allowlist, not a filter.
 
-> A typed schema is an allowlist. A residual payload with PII stripped out is a denylist. Under a deletion obligation, the two failure modes are not comparable.
+> An SSP starts sending a new user-level identifier in its payload. It lands in Bronze, where everything lands, and it is gone at day 7. It never reaches Silver, because nobody added it to the allowlist — nobody had to notice it, classify it, or update a filter. **An allowlist's worst case is losing a field we wanted. A denylist's worst case is keeping one we were obliged to delete.**
 
-An allowlist fails *closed*: an identifier nobody mapped is never typed, so it never reaches Silver. A denylist fails *open*: it lands in the residual column, is retained forever, and stays invisible until an audit.
+`auction_id` looks like the case that breaks this. It stays in Silver — the five events of one auction cannot be tied together without it — and pseudonymous is not anonymous while a re-linking key exists. But the re-linking key is Bronze, and Bronze expires: on day 8, `auction_id` is a string that groups five rows and joins to nothing. **It does not need to be removed; it needs to stop meaning anything, and the retention rule does that on a schedule.** The quality job asserts that the distinct-`auction_id` count tracks the auction count — a value repeating across auctions would make it a session key, the one way this argument fails.
 
-> An SSP starts sending a new user-level identifier in its payload. It lands in Bronze, where everything lands, and it is gone at day 7. It never reaches Silver, because nobody added it to the allowlist — nobody had to notice it, classify it, or update a filter. An allowlist's worst case is losing a field we wanted. A denylist's worst case is keeping one we were obliged to delete.
+**The honest cost: a field nobody typed is unrecoverable after a week.** Against an indefinite raw archive that would be a query; here it is a wall, and the strongest attack available on this design.
 
-`auction_id` looks like the case that breaks this. It stays in Silver — the five events of one auction cannot be tied together without it — and pseudonymous is not anonymous while a re-linking key exists. But the re-linking key is Bronze, and Bronze expires: `auction_id` points back at a person only while the raw payload holding the identifiers is still there. On day 8 it is a string that groups five rows and joins to nothing. **It does not need to be removed; it needs to stop meaning anything, and the retention rule does that on a schedule.** The quality job asserts that the distinct-`auction_id` count tracks the auction count: a value repeating across auctions would make it a session key, the one way this argument fails.
+## Every copy of the raw record, named
 
-## What we permanently lose
+The rule binds the record, not the store. Two of these are not layers, and the last one is not ours.
 
-**A field nobody typed is unrecoverable after a week.** Against an indefinite raw archive that would be a query; here it is a wall, and the strongest attack available on this design.
+| Copy | Expires by | At |
+|---|---|---|
+| **Pub/Sub backlog**, and the dead-letter topic with it | subscription retention on both, declared in Terraform — 7 days is also the default, so the control is the review, not the value | 7 days |
+| **Bronze table** | `partition_expiration_days` — a table property, not a job that has to run | 7 days |
+| **GCS archive** | bucket lifecycle rule, with soft-delete retention set to **0**: the default puts every lifecycle-deleted object in a 7-day holding area behind it | 7 days |
+| **Bronze time travel, then fail-safe** | `max_time_travel_hours = 48`, BigQuery's minimum, then a fixed 7-day fail-safe that cannot be configured, queried, or shortened | **day 16** at the earliest |
 
-Silver is typed *wide* — every structured non-PII field gets a column whether a metric uses it today or not — and the quality job reports payload keys with no entry in the mapping, so the gap between an SSP sending something new and us typing it is measured in days rather than quarters. *The mitigation is not a mechanism, it is a shorter gap.*
+Three we declare, one we disclose, and beneath the archive one more we switch off — and not one of them a job that has to run. **The answer to an auditor on the last row is that number, not a denial**: a residue no query of ours can read, no process of ours can pause, and no request of ours can extend, expiring on a clock the storage engine runs. Naming it is also the only way to be *sure* it expires — a design that claims day 7 has no reason to check what happens on day 8.
 
-## The consequence that runs through the rest of Part 1
-
-The usual defence of every layer below raw is *"it is recreatable from raw."* Here that sentence is true for seven days and false afterwards.
-
-> The error budget moved from *we can always rebuild* to *we must be right inside 7 days, and know it*.
-
-Data quality is therefore load-bearing rather than hygiene, and the checks run hourly. A check that surfaces a problem on day 3 is a repair; the same check running weekly is an obituary.
-
-**Cost.** Bronze storage at a 7-day window is \~$140/month, against \~$1,600 at 90 days — the constraint that removes the safety net pays for a third to a half of the layer kept forever. The GCS archive holds 7 days for \~$210/month, and Silver, indefinite and typed wide, is \~$3,000–4,400/month at five years. Storage goes down and compute goes up; presenting only the saving would be dishonest by omission.
+**Cost.** Bronze's 7 days are \~$200/month against \~$2,500 at 90 days. The residue in the last row costs nothing, because Bronze bills logically and logical billing does not charge for time-travel or fail-safe bytes — bullet 2.2 shows why an expiring table takes that setting. The GCS archive holds the same week for \~$210. **The copy nobody chose to keep still has to be disclosed, even when it is free.**
 
 ## Rejected — one line each
 
 | Option | Why not |
 |---|---|
-| **Keep only Gold, drop Silver** | The cheapest answer, and it fixes the analysable dimension combinations at design time. Silver's are fixed at query time |
+| **Keep only Gold, drop Silver** | The cheapest answer, and it fixes the analysable dimension combinations at design time — ask Gold for *fill rate by device on one ad unit during a specific incident* and the rows were already collapsed. Silver's are fixed at query time |
 | **Silver at 13 months** | A bounded window only works if the layer can be rebuilt, and past day 7 there is nothing to rebuild from |
 | **A residual JSON column in Silver** | The residual payload *is* the personal data — keeping it in an indefinitely-retained table means keeping forever the exact bytes the rule requires us to delete in seven days |
-| **Strip PII at ingest, in a stream processor** | A denylist enforced by a running process rather than by a table definition, and irreversible in the wrong direction: a bug destroys data on the only copy |
-| **Per-layer retention tuned independently** | Four numbers, four separate justifications, no logic connecting them — exactly the shape a reviewer picks apart |
-| **A scheduled purge job** | Partition expiration does the same with no code and no schedule. Under a legal obligation, a deletion that is a table property cannot be quietly paused |
+| **Backlog retention at Pub/Sub's 31-day maximum** | A deeper buffer is a longer-lived copy of the raw record. Replay past day 7 has nothing to replay *into* — Bronze is gone — so the depth breaches the ceiling and buys nothing |
+| **Leaving GCS soft delete at its 7-day default** | Turns a 7-day lifecycle rule into a 14-day one, invisibly, on the copy the rule binds hardest |
+| **Time travel at BigQuery's 7-day default** | **Five** extra days of queryable raw payload past expiry — pushing the last row from day 16 to day 21 — to protect a table that is immutable and already archived to GCS |
 
 ---
 

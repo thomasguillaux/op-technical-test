@@ -36,7 +36,14 @@ with Diagram(
 
     # ---------------------------------------------------------------- hot path
     with Cluster("Hot path — seconds · nothing of ours runs here · PII lives here"):
-        topic = PubSub("events topic\ndurable buffer")
+        # The 7 days is SUBSCRIPTION backlog retention, declared per subscription in
+        # Terraform. Topic-level message retention is a separate Pub/Sub control, off by
+        # default, and left off — labelling the topic box "7 days" would state on the
+        # picture the thing part_1/00 spends a paragraph rejecting.
+        topic = PubSub(
+            "events topic · envelope schema\n"
+            "durable buffer — subscriptions retain undelivered 7 days"
+        )
         dlq = PubSub("dead-letter topic")
         bronze = BigQuery(
             "BRONZE · bronze_events · 7 days (compliance)\n"
@@ -65,7 +72,7 @@ with Diagram(
         v_opp = BigQuery("v_opportunity_hourly / _daily\neCPM, fill rate, rpm")
         v_ssp = BigQuery("v_ssp_hourly / _daily\nresponse rate, win rate")
 
-    bi = Client("BI — hourly (release watch) + daily (trend)\nYield copilot — Part 2")
+    bi = Client("BI — hourly + daily\nrelease watch · trend\nYield copilot — Part 2")
 
     with Cluster("Alerting — the one thing Dataform does not ship"):
         logs = Logging("workflow\ninvocations")
@@ -76,7 +83,23 @@ with Diagram(
     collector >> Edge(label="~23k events/s") >> topic
     topic >> Edge(label="BigQuery subscription") >> bronze
     topic >> Edge(label="Cloud Storage subscription") >> archive
-    topic >> Edge(label="schema violation", style="dashed", color="firebrick") >> dlq
+
+    # Two rejection paths, and they are not the same failure. An envelope violation
+    # never enters Pub/Sub: the publish call fails synchronously, on the producer's
+    # side of the buffer. Dead-lettering happens one step later, on the BigQuery
+    # subscription — hence the label; the archive subscription is unaffected, which
+    # is what makes a dead letter replayable rather than lost.
+    topic >> Edge(
+        label="envelope violation\nrefused at publish",
+        style="dashed",
+        color="firebrick",
+        constraint="false",
+    ) >> collector
+    topic >> Edge(
+        label="BigQuery subscription refused the write\nschema drift · payload not valid JSON",
+        style="dashed",
+        color="firebrick",
+    ) >> dlq
 
     bronze >> Edge(label="watermark\nQUALIFY + MERGE") >> silver
     archive >> Edge(label="BigLake replay", style="dashed", color="darkgreen") >> bronze
