@@ -53,7 +53,7 @@ It fails on one repair, and one is enough. A revenue share is renegotiated and b
 
 So a batch path must exist regardless. The continuous design ships two execution models where batch ships one: it keeps the watermark, the `MERGE`, the change detection and the orchestrator anyway, and adds \~10 GB of live keyed state on top. The simplicity argument turns around.
 
-**Cost.** The separation buys no component. Both paths are priced where their components are, in bullets 1.2, 2.1 and 2.2. The priced item is what it avoids: a speed layer means a streaming runtime on the full firehose, low thousands per month, to deliver an hourly figure the hour boundary already caps.
+**Cost.** The separation buys no component. Both paths are priced where their components are, in bullets 1.2, 2.1 and 2.2. The priced item is what it avoids: a speed layer means a streaming runtime on the full firehose, low thousands per month.
 
 ## Rejected — one line each
 

@@ -28,11 +28,11 @@ Dataform runs all of it — SQLX in Git, dependencies declared in the code, asse
 
 ## Two spines
 
-Six components lost to the same sentence: *a runtime we operate, placed between us and something we could call directly.* Dataflow, Composer and dbt Core here; Cube, LangChain and a vector database in Part 2. One rule applied six times is a design; six separate verdicts would be taste. Dataform's templating runs at compile time — **a build step is not a runtime.**
+Six components lost to the same sentence: Dataflow, Composer and dbt Core here; Cube, LangChain and a vector database in Part 2. Dataform's templating runs at compile time — **a build step is not a runtime.**
 
-**Raw data is transient; the durable record is the anonymised event layer.** The error budget moves from *we can always rebuild* to *we must be right inside 7 days, and know it*. Quality monitoring is therefore load-bearing here rather than hygiene, and the checks run hourly: a check that surfaces a problem on day 3 is a repair, the same check running weekly is an obituary.
+The error budget moves from *we can always rebuild* to *we must be right inside 7 days, and know it*. Quality monitoring is therefore load-bearing here rather than hygiene, and the checks run hourly: a check that surfaces a problem on day 3 is a repair, the same check running weekly is an obituary.
 
-**Cost.** No total on this page, and none anywhere — each page prices its own decision, so no argument rests on a figure. The largest single lever in Part 1 is not a component choice. It is Bronze's partition grain, **\~$5,100/month between hourly and daily**, on one clause of DDL.
+**Cost.** The largest single lever in Part 1 is not a component choice. It is Bronze's partition grain, **\~$5,100/month between hourly and daily**, on one clause of DDL.
 
 ## Where to go deeper
 
