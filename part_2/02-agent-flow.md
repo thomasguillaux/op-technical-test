@@ -6,7 +6,9 @@
 
 ## The flow, hop by hop
 
-One stateless `POST` per question, and a loop that runs at most twice: the model names a tool, our code executes it, the result goes back, the model narrates. **Everything the model produces passes through code we own before it reaches BigQuery.**
+One stateless `POST` per question, and a loop that runs at most twice. The model names a tool, our code executes it, the result goes back, the model narrates.
+
+**Everything the model produces passes through code we own before it reaches BigQuery.**
 
 | # | Hop | Mechanism | Latency |
 |---|---|---|---|
@@ -24,17 +26,17 @@ One stateless `POST` per question, and a loop that runs at most twice: the model
 
 The test offers *"LangChain or FastAPI"*. Those are not alternatives: LangChain is a framework, FastAPI is the HTTP layer. **The real choice is LangChain inside FastAPI against our own loop inside FastAPI** — that loop is hops 3 to 8, about fifty lines against one provider.
 
-LangChain v1 shipped 2025-10-22 and `create_agent` runs on the LangGraph runtime; its `wrap_tool_call` middleware receives a tool call *before* execution, and returning a `ToolMessage` without invoking `handler` rejects it. **So LangChain can hold the guardrail seam**; claiming otherwise is a strawman.
+LangChain v1 shipped 2025-10-22, and `create_agent` runs on the LangGraph runtime. Its `wrap_tool_call` middleware receives a tool call *before* execution. Returning a `ToolMessage` without invoking `handler` rejects it. So LangChain can hold the guardrail seam.
 
-**The objection is a dependency one.** We own the seam either way; one of the two ways is a framework whose agent entry point moved packages inside a year — `AgentExecutor` now ships in a separate `langchain-classic` package, `create_agent` is the supported path. This is the argument that removed Dataflow, Composer and dbt Core in Part 1, and Cube and a vector database alongside LangChain in Part 2: *a runtime we operate, placed between us and something we could call directly.*
+**The objection is a dependency one.** We own the seam either way. One of the two ways is a framework whose agent entry point moved packages inside a year. `AgentExecutor` now ships in a separate `langchain-classic` package. `create_agent` is the supported path. This is the argument that removed Dataflow, Composer and dbt Core in Part 1, and Cube and a vector database alongside LangChain in Part 2: *a runtime we operate, placed between us and something we could call directly.*
 
 ## The model call, concretely
 
-The SDK is the **Google Gen AI SDK** (`google-genai`) — `genai.Client(vertexai=True, project=…, location=…)`. Not the Vertex AI SDK: `vertexai.generative_models` was deprecated 2025-06-24 and **removed 2026-06-24** — and Google's own *"Forced function calling"* sample still uses the removed API, so a live Google sample copied today ships dead code.
+The SDK is the Google Gen AI SDK (`google-genai`) — `genai.Client(vertexai=True, project=…, location=…)`. Not the Vertex AI SDK: `vertexai.generative_models` was deprecated 2025-06-24 and removed 2026-06-24. Google's own *"Forced function calling"* sample still uses the removed API, so a live Google sample copied today ships dead code.
 
-Pass Python callables to the SDK and it enables *automatic function calling*: the SDK executes the function itself, up to `maximum_remote_calls` (default 10) — nowhere to put hops 5 to 7. So tools are declared as `FunctionDeclaration`s and `automatic_function_calling=AutomaticFunctionCallingConfig(disable=True)` is set explicitly. **That one flag is the difference between a guarded executor and a model calling BigQuery directly.**
+Pass Python callables to the SDK and it enables *automatic function calling*. The SDK executes the function itself, up to `maximum_remote_calls` (default 10) — nowhere to put hops 5 to 7. So tools are declared as `FunctionDeclaration`s and `automatic_function_calling=AutomaticFunctionCallingConfig(disable=True)` is set explicitly. **That one flag is the difference between a guarded executor and a model calling BigQuery directly.**
 
-Parallel function calling — several calls in one turn, no documented flag to disable it — means every call is answered before hop 3 runs again.
+Every call is answered before hop 3 runs again. Parallel function calling means several calls in one turn, no documented flag to disable it.
 
 **No model ID is pinned:** Flash tier, function calling, a 12-month availability class. IDs churn — `gemini-2.5-flash` retires 2026-10-20.
 
@@ -50,9 +52,9 @@ Parallel function calling — several calls in one turn, no documented flag to d
 
 ## Build vs buy — build: the API can't force the guardrail
 
-Google's Conversational Analytics API went **GA for BigQuery on 2026-06-23** and now carries most of this page: `big_query_max_billed_bytes`, IAM scoping, custom BigQuery routines registered as `user_functions.bqRoutines`, and semantically matched example queries. That closes most of the gap; two things survive.
+Google's Conversational Analytics API went GA for BigQuery on 2026-06-23 and now carries most of this page: `big_query_max_billed_bytes`, IAM scoping, custom BigQuery routines registered as `user_functions.bqRoutines`, and semantically matched example queries. That closes most of the gap; two things survive.
 
-**Nothing makes the routine mandatory.** The docs say a registered routine is used *"if they're needed"* and that a matched example query *"might"* be executed; our loop's `mode = ANY` with `allowed_function_names` (1.1) removes the choice. No mechanism for forcing it is documented, and every steering primitive the docs describe is advisory. Removing model choice on the uncatchable question class is the design; an agent product sells the opposite.
+**Nothing makes the routine mandatory.** The docs say a registered routine is used *"if they're needed"* and that a matched example query *"might"* be executed; our loop's `mode = ANY` with `allowed_function_names` (1.1) removes the choice. No mechanism for forcing it is documented, and every steering primitive the docs describe is advisory. Removing model choice on the uncatchable question class is the design. An agent product cannot remove that choice.
 
 **Table selection is documented as not being a security control.** Verbatim: *"Table selection isn't a security setting. Even if you specify that the data source can only pull information from certain tables — like table1 and table2 — the system might still return data from an unintended table (table3) if the user running the query has general permissions."* The test asks how a hallucination is stopped from reading terabytes of raw data. The product documents that its scoping does not answer that; hop 7's service account does.
 

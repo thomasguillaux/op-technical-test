@@ -2,7 +2,7 @@
 
 *Test bullet: what guardrails (IAM rights, query quotas, SQL validation) do you plan to put in place to prevent an LLM hallucination from triggering a `SELECT *` on several terabytes of raw data?*
 
-**All three, and the bullet lists them in the reverse of the order they fire.** SQL validation runs first, in our code, before BigQuery is called at all; IAM runs last. Between them sits a fourth the bullet does not name: **the dry run**, the layer that puts the *engine* rather than the model in charge of the byte estimate.
+**All three, and the bullet lists them in the reverse of the order they fire.** SQL validation runs first, in our code, before BigQuery is called at all; IAM runs last. Between them sits a fourth the bullet does not name: the dry run, the layer that puts the *engine* rather than the model in charge of the byte estimate.
 
 | # | Layer | What it stops | Enforced by |
 |---|---|---|---|
@@ -13,11 +13,13 @@
 
 Query quotas are the bullet's middle term and are deliberately not in this table: they bound a *day* of queries, not one query.
 
-**2 — The dry run.** BigQuery returns bytes-to-be-scanned **without executing**. It also returns something better than a number: the job statistics carry **`referencedTables`, the engine's own resolved list of the objects the query reads.** Depending on how the engine expands a view, that list names the view or the Gold table behind it — so the check is written against both: every resolved object must sit in the semantic dataset or in the Gold dataset it is authorized over, and nothing else. The objects a query touches are therefore checked twice, once against our parse and once against BigQuery's own: **a parser can be wrong about what a query names; the engine cannot.**
+**2 — The dry run.** BigQuery returns bytes-to-be-scanned without executing, plus `referencedTables` — the engine's own resolved list of the objects the query reads. Depending on how it expands a view, that list names the view or the Gold table behind it, so the check accepts both: every resolved object must sit in the semantic dataset or the Gold dataset it is authorized over.
 
-**3 — `maximum_bytes_billed`.** A query estimated above it **fails without incurring a charge**, returning `Query exceeded limit for bytes billed: … or higher required.` Layers 1 and 2 are code we wrote and could get wrong; this one holds if both do.
+That checks the objects twice, once against our parse and once against BigQuery's. **A parser can be wrong about what a query names; the engine cannot.**
 
-**Set on every job the orchestrator issues, not only on `run_query`.** Layers 1 and 2 rightly skip `diagnose_change` and `resolve_entity` — their SQL is ours, and re-parsing our own statements against our own allowlist tests nothing a unit test does not. Their *scope* is still the model's: it picks `period` and `filters`, and a year-long period makes correct fixed SQL scan twenty months of every publisher. **On the free-SQL path the ceiling bounds a statement the model wrote; on the fixed path, the arguments it chose.**
+**3 — `maximum_bytes_billed`.** A query estimated above it fails without incurring a charge, returning `Query exceeded limit for bytes billed: … or higher required.` Layers 1 and 2 are code we wrote and could get wrong; this one holds if both do.
+
+Set on every job the orchestrator issues, not only on `run_query`. Layers 1 and 2 rightly skip `diagnose_change` and `resolve_entity` — their SQL is ours, and re-parsing our own statements against our own allowlist tests nothing a unit test does not. Their *scope* is still the model's: it picks `period` and `filters`, and a year-long period makes correct fixed SQL scan twenty-four months of every publisher. On the free-SQL path the ceiling bounds a statement the model wrote. On the fixed path, it bounds the arguments the model chose.
 
 **4 — IAM, the grant argued in 3.1.** The only layer that does not depend on any code of ours being right.
 
@@ -29,13 +31,13 @@ Query quotas are the bullet's middle term and are deliberately not in this table
 
 ## Query quotas — the layer that bounds N, not one query
 
-**A model in a retry loop is not one job, and neither is ten analysts on a bad afternoon** — a hundred queries each individually under the ceiling is a bill no layer above has looked at.
+A model in a retry loop is not one job, and neither is ten analysts on a bad afternoon. A hundred queries each individually under the ceiling is a bill no layer above has looked at.
 
-BigQuery's custom quotas close it. **`QueryUsagePerUserPerDay`** applies per user and per service account, so it caps the copilot's entire day independently of the humans; **`QueryUsagePerDay`** caps the project. Both are **proactive** — a query that would exceed the remaining allowance does not run, rather than running and being counted afterwards.
+BigQuery's custom quotas close it. `QueryUsagePerUserPerDay` applies per user and per service account, so it caps the copilot's entire day independently of the humans; `QueryUsagePerDay` caps the project. Both are proactive: a query that would exceed the remaining allowance does not run, rather than running and being counted afterwards.
 
-**They apply only under on-demand pricing.** Part 1's compute-billing choice is therefore a precondition for this guardrail, not an unrelated cost decision — and it is the same choice that makes a hallucinated heavy query fail *alone*. Under a shared BigQuery Editions reservation it takes slots from the pipeline and starves Silver's 30-minute cadence: **the copilot's blast radius stops being a bill and becomes a freshness incident, which is the materially worse failure.**
+**They apply only under on-demand pricing.** Part 1's compute-billing choice is therefore a precondition for this guardrail, not an unrelated cost decision, and it is the same choice that makes a hallucinated heavy query fail *alone*. Under a shared BigQuery Editions reservation it takes slots from the pipeline and starves Silver's 30-minute cadence. The copilot's blast radius stops being a bill and becomes a freshness incident, the worse failure.
 
-**And Google documents custom quotas as approximate** — *"an additional safeguard against excessive spending… not designed to strictly limit bytes processed"*. This is a spend bound, not an accounting control.
+And Google documents custom quotas as approximate — *"an additional safeguard against excessive spending… not designed to strictly limit bytes processed"*. This is a spend bound, not an accounting control.
 
 ## The guarded execution path
 
@@ -77,8 +79,8 @@ def execute(sql: str, client: bigquery.Client, params=None):
         query_parameters=params or [],
     )).result()
 
-def run_query(sql: str, client: bigquery.Client):
-    validate(sql)                                     # layers 1-2: model-written SQL only
+def run_query(sql: str, client: bigquery.Client):     # layers 1-2: model-written SQL only
+    validate(sql)
 
     dry = client.query(sql, bigquery.QueryJobConfig(dry_run=True, use_query_cache=False))
     for t in dry.referenced_tables:                   # the engine's resolution, not our parse
@@ -93,11 +95,11 @@ def run_query(sql: str, client: bigquery.Client):
 
 ## What the four layers do not cover
 
-**The narration is unguarded.** Even when the fixed routine returns a correct, deterministic result set, the model writes the prose describing it — and prose can misrepresent a correct table. The mitigation is already in the flow: the executed SQL and the rows returned with the answer, which is what makes a *what* answer checkable at all.
+The narration is unguarded. Even when the fixed routine returns a correct, deterministic result set, the model writes the prose describing it — and prose can misrepresent a correct table. The mitigation is already in the flow: the executed SQL and the rows returned with the answer, which is what makes a *what* answer checkable at all.
 
-**None of these layers makes an answer true.** Every one of them bounds blast radius and spend. Correctness is 1.1's job, and the fact that those are two different problems is why the design splits the question classes rather than piling guardrails onto a single path.
+None of these layers makes an answer true. Every one of them bounds blast radius and spend. Correctness is 1.1's job, and the fact that those are two different problems is why the design splits the question classes rather than piling guardrails onto a single path.
 
-**Prompt injection has no surface here.** The classic vector is untrusted prose sitting in a retrieved corpus. The client's *"pas de texte libre, que des données liées aux enchères"* means there is no prose anywhere in this data — every field is an enumeration or a number. The only untrusted input is the question itself, typed by one of ten employees.
+Prompt injection has no surface here. The classic vector is untrusted prose sitting in a retrieved corpus. The client's *"pas de texte libre, que des données liées aux enchères"* means there is no prose anywhere in this data — every field is an enumeration or a number. The only untrusted input is the question itself, typed by one of ten employees.
 
 **Cost.** A dry run consumes no slots and is not billed, so the estimate that prevents the expensive query is itself free. The ceiling and the daily quota are insurance, not levers: they bound the worst query and the worst month, and change the bill only on the day something goes wrong. What moves the monthly total is not on this page — it is the grant in 3.1, which decides what a *normal* question scans.
 
