@@ -71,4 +71,4 @@ Buying wins for an organisation already on Looker, or without an engineer to own
 
 ---
 
-Next: [**2.1 — Semantic Layer**](/part_2/03-semantic-layer.md)
+Next: [**2.1 — Metrics & Business Glossary**](/part_2/03-semantic-layer.md)

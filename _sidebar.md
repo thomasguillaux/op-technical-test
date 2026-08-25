@@ -16,3 +16,9 @@
   - AI Agent Architecture
     - [1.1 Copilot Scope & Question Classes](/part_2/01-question-classes.md)
     - [1.2 User → Orchestrator → Model → BigQuery](/part_2/02-agent-flow.md)
+  - Semantic Layer & Context Modeling
+    - [2.1 Metrics & Business Glossary](/part_2/03-semantic-layer.md)
+    - [2.2 Synonym & Metadata Management](/part_2/04-glossary-and-entities.md)
+  - Security & Cost Management
+    - [3.1 Gold, Through Its Views Only](/part_2/05-query-layer.md)
+    - [3.2 Guardrails](/part_2/06-guardrails.md)

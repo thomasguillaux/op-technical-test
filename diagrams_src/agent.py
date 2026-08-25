@@ -56,10 +56,10 @@ with Diagram(
 
     resolve = PredefinedProcess("resolve_entity\nlive dimension values,\nnot a vector index")
 
-    with Cluster("4. IAM — the only dataset the service account holds SELECT on"):
+    with Cluster("4. IAM — one dataset, authorized on Gold. The only SELECT grant"):
         v_opp = BigQuery("v_opportunity_hourly / _daily")
         v_ssp = BigQuery("v_ssp_hourly / _daily")
-        quality = BigQuery("quality_hour")
+        quality = BigQuery("v_quality_hour")
 
     with Cluster("Outside the grant", graph_attr={"style": "dashed"}):
         raw = BigQuery("bronze_events · silver_events\ngold base tables")
