@@ -22,7 +22,7 @@
 | 8 | Result → model | `Part.from_function_response(...)` appended to `contents`; the loop returns to hop 3 | ms |
 | 9 | Narration → FastAPI → analyst | Four fields on the same `POST`: the prose, the executed SQL, the rows, and the period's quality verdict | ~1–2 s |
 
-**The objection is a dependency one.** We own the seam either way. One of the two ways is a framework whose agent entry point moved packages inside a year. `AgentExecutor` now ships in a separate `langchain-classic` package. `create_agent` is the supported path. This is the argument that removed Dataflow, Composer and dbt Core in Part 1, and Cube and a vector database alongside LangChain in Part 2: *a runtime we operate, placed between us and something we could call directly.*
+**The objection is a dependency one.** We own the seam either way; one version of it adds a framework whose agent entry point moved packages inside a year. `AgentExecutor` now ships in a separate `langchain-classic` package. `create_agent` is the supported path. This is the argument that removed Dataflow, Composer and dbt Core in Part 1, and Cube and a vector database alongside LangChain in Part 2: *a runtime we operate, placed between us and something we could call directly.*
 
 **Cost.** BigQuery bytes dominate per question, not tokens, and the ceiling at hop 7 bounds the worst case, not the average. Context caching is not a lever: the minimum cacheable prefix for the Gemini 3 family is 4,096 tokens, below which the dictionary block sits.
 

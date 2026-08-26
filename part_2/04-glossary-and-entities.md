@@ -33,7 +33,7 @@ ORDER BY distance
 LIMIT 5
 ```
 
-**Cost.** The dictionary is a few thousand tokens on every request. `resolve_entity` scans one string column over a 30-day window of a Gold-derived view — cents. The cost worth naming appears on no bill. An embedding pipeline, an index and a re-indexing job are a component to operate and a staleness failure to notice, and neither is a line item.
+**Cost.** The dictionary is a few thousand tokens on every request. `resolve_entity` scans one string column over a 30-day window of a Gold-derived view — cents. The cost of the rejected alternative is operational rather than billed: an embedding pipeline, an index and a re-indexing job are a component to operate and a staleness failure to notice.
 
 ## Rejected — one line each
 

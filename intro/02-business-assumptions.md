@@ -17,9 +17,9 @@ Requirements only, never mechanisms. A line belongs here only if it stays true u
 | **Users**             | \~10 people, all seeing all publishers — **no entitlement scoping, so no row-level security to design.**                                | Given                                                               |
 | **Rhythm**            | Two rhythms, not two resolutions of one need. *Look at yesterday, act today* is trend work. *Ship, then watch* is episodic: nobody stares at an hourly chart, but on a deploy day the closed hour is read within minutes.                                         | Derived                                                               |
 
-**The retention answer is the one that reaches furthest.** Raw data is transient, so the durable record is the anonymised event layer — and the error budget moved from *we can always rebuild* to *we must be right inside 7 days, and know it*. That is [the anonymisation boundary in 2.1](/part_1/04-medallion-model.md).
+**Retention is the assumption that constrains the most decisions downstream.** Raw data is transient, so the durable record is the anonymised event layer, and the error budget is *we must be right inside 7 days, and know it* rather than *we can always rebuild*. See [the anonymisation boundary in 2.1](/part_1/04-medallion-model.md).
 
-**The two timing bounds still come from a conversation, not a measurement.** Every window in the design derives from that 1-hour figure, so the pipeline measures it, per hour and per publisher. The answer to *"what if lateness is worse than you assumed?"* is **"we would know, and here is the metric."**
+**The two timing bounds come from a conversation, not a measurement.** Every window in the design derives from that 1-hour figure, so the pipeline measures it per hour and per publisher (`quality_hour.late_beyond_1h`). If lateness is worse than assumed, that metric reports it.
 
 ---
 

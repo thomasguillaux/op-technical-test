@@ -20,7 +20,7 @@ BigQuery's authorized datasets close it. The semantic dataset is authorized on t
 | **Bronze** | A read across the full 7-day window, ~10.5 TB logical | **~$60** |
 | **Silver** | Nothing expires, so this figure has no ceiling — hundreds of TB at five years | **thousands, on a table larger every month** |
 
-**So the layer choice is the largest cost control in Part 2, and it is not a guardrail — it is an IAM grant.** A design that leaves the agent on Silver and defends the bill with query-time limits is paying attention to the query that goes wrong and none to the thousands that go right.
+**The layer choice is therefore the largest cost control in Part 2, and it is enforced by the IAM grant rather than by a guardrail.** Query-time limits bound the query that goes wrong. The grant bounds every query, including the thousands that run correctly.
 
 **Cost.** A logical view stores no bytes and adds none to a scan — it is expanded into the referencing query, so the reader pays for the partitions the base table would have charged for anyway.
 

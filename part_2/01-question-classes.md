@@ -2,7 +2,7 @@
 
 *Test bullet: we want to deploy a copilot capable of answering business questions such as: "Why did the eCPM of publisher X drop by 20% yesterday on the video format?"*
 
-**The split is whether the person receiving a wrong answer can catch it.** *What* — a number, a ranking, a trend — the model writes the SQL, because a wrong figure looks wrong to someone who sees it daily. *Why* — a cause, an attribution — runs a decomposition we wrote, because nothing in a result set tells a model the cause, and a fluent invented one is the failure nobody catches.
+**The split is whether the person receiving a wrong answer can catch it.** *What* — a number, a ranking, a trend — the model writes the SQL, because a wrong figure looks wrong to someone who sees it daily. *Why* — a cause, an attribution — runs a decomposition we wrote, because nothing in a result set tells a model the cause, and an invented cause reads exactly like a correct one.
 
 ---
 
@@ -25,7 +25,7 @@ A text-to-SQL agent writes one query, gets one number, and narrates a cause — 
 
 ## Nor does a routine library
 
-Routines only answer questions someone anticipated. *"Which ad units on mobile lost fill rate after we dropped SSP X"* is a shape nobody scripted and exactly what a Yield analyst asks on a Tuesday. Every new shape becomes a ticket. And it answers around the named deliverable, a Text-to-SQL + RAG pattern. One routine, not a library.
+Routines only answer questions someone anticipated. *"Which ad units on mobile lost fill rate after we dropped SSP X"* is a shape nobody scripted, and an ordinary Yield question. Every new shape becomes a ticket. And it answers around the named deliverable, a Text-to-SQL + RAG pattern. One routine, not a library.
 
 ## The routing objection — enforced by the API, not the prompt
 
@@ -72,7 +72,7 @@ Same drop, two different causes: shares moved and no rate changed (mix), or shar
 
 **4 — Materiality floor.** A segment with 200 impressions can show a 300% eCPM swing and top the ranking. Segments below 1% of the period's denominator are collapsed into `other`, not dropped — so the contributions still sum to the total.
 
-The model receives a structured result: quality verdict, baseline used, headline, the factorisation, per-segment rate and mix. It writes the sentence. **It chose what to investigate and invented no part of how.**
+The model receives a structured result: quality verdict, baseline used, headline, the factorisation, per-segment rate and mix. It writes the prose around those numbers, and none of the SQL that produced them.
 
 ## The honest limit
 

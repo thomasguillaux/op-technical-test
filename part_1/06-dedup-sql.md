@@ -16,7 +16,7 @@ QUALIFY ROW_NUMBER() OVER (
         ) = 1
 ```
 
-That does not make the window function optional, and the reason is sharper than *"the `MERGE` would fail"*. Two copies of an `event_id` Silver already holds do fail the run — `UPDATE/MERGE must match at most one source row for each target row`. Two copies of an `event_id` it has never seen match nothing, take `WHEN NOT MATCHED`, and insert twice with no error. That second case is the common one, a same-batch double-send of a new event, and the dangerous one. **The window function makes the `MERGE` legal, and the `MERGE` makes the dedup correct across runs — within the auction day.** It guarantees one row per `event_id` *entering* the reference joins. Non-overlapping `valid_from`/`valid_to` on the revenue-share table guarantees one row *leaving* them. That table's validity windows are a correctness property, not a convenience.
+That does not make the window function optional, and the reason is not simply that the `MERGE` would fail. Two copies of an `event_id` Silver already holds do fail the run — `UPDATE/MERGE must match at most one source row for each target row`. Two copies of an `event_id` it has never seen match nothing, take `WHEN NOT MATCHED`, and insert twice with no error. That second case is the common one, a same-batch double-send of a new event, and the dangerous one. **The window function makes the `MERGE` legal, and the `MERGE` makes the dedup correct across runs — within the auction day.** It guarantees one row per `event_id` *entering* the reference joins. Non-overlapping `valid_from`/`valid_to` on the revenue-share table guarantees one row *leaving* them. That table's validity windows are a correctness property, not a convenience.
 
 ```sql
 CASE source_id

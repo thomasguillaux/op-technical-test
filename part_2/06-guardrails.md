@@ -75,7 +75,7 @@ def run_query(sql: str, client: bigquery.Client):     # layers 1-2: model-writte
     return execute(sql, client)
 ```
 
-**Cost.** A dry run consumes no slots and is not billed, so the estimate that prevents the expensive query is itself free. The ceiling and the daily quota are insurance, not levers: they bound the worst query and the worst month, and change the bill only on the day something goes wrong. What moves the monthly total is not on this page — it is the grant in 3.1, which decides what a *normal* question scans.
+**Cost.** A dry run consumes no slots and is not billed, so the estimate that prevents the expensive query is itself free. The ceiling and the daily quota are insurance, not levers: they bound the worst query and the worst month, and change the bill only on the day something goes wrong. What moves the monthly total is the grant in 3.1, which decides what a *normal* question scans.
 
 ## Rejected — one line each
 
