@@ -73,7 +73,7 @@ LIMIT 5
 
 | Option | Why not |
 |---|---|
-| **Vector database** | The client removed the last case for one: *"pas de texte libre, que des données liées aux enchères"*, so every field is an enumeration or a number and **semantic search has nothing to search.** If the dictionary ever does outgrow the context window, BigQuery's own `VECTOR_SEARCH` is the answer, not a separate database — the rule that removed every other standalone runtime |
+| **Vector database** | The client removed the last case for one: *"no free text, only auction-related data"*, so every field is an enumeration or a number and **semantic search has nothing to search.** If the dictionary ever does outgrow the context window, BigQuery's own `VECTOR_SEARCH` is the answer, not a separate database — the rule that removed every other standalone runtime |
 | **A data catalog** | A catalog is a governance and discovery surface for *humans* at 200 tables and 40 analysts, where nobody holds the model in their head. **The LLM does not read a catalog:** something would have to export it into the prompt, which makes it an authoring tool for the dictionary rather than a replacement for it. And Dataform already publishes column descriptions into it, so it sits *downstream* of the SQLX |
 | **dbt tags** | Dead with the dbt runtime, removed in Part 1. Dataform column descriptions are the equivalent and sit closer to the SQL |
 | **A vector index over entity names** | A copy of a dimension table, with a staleness problem the dimension table does not have |
