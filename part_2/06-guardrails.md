@@ -99,7 +99,7 @@ The narration is unguarded. Even when the fixed routine returns a correct, deter
 
 None of these layers makes an answer true. Every one of them bounds blast radius and spend. Correctness is 1.1's job, and the fact that those are two different problems is why the design splits the question classes rather than piling guardrails onto a single path.
 
-Prompt injection has no surface here. The classic vector is untrusted prose sitting in a retrieved corpus. The client's *"pas de texte libre, que des données liées aux enchères"* means there is no prose anywhere in this data — every field is an enumeration or a number. The only untrusted input is the question itself, typed by one of ten employees.
+Prompt injection has no surface here. The classic vector is untrusted prose sitting in a retrieved corpus. The client's *"no free text, only auction-related data"* means there is no prose anywhere in this data — every field is an enumeration or a number. The only untrusted input is the question itself, typed by one of ten employees.
 
 **Cost.** A dry run consumes no slots and is not billed, so the estimate that prevents the expensive query is itself free. The ceiling and the daily quota are insurance, not levers: they bound the worst query and the worst month, and change the bill only on the day something goes wrong. What moves the monthly total is not on this page — it is the grant in 3.1, which decides what a *normal* question scans.
 
