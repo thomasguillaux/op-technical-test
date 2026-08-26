@@ -1,8 +1,5 @@
-# Retention & Anonymisation
 
-> *"Raw logs are kept 7 days. Aggregation anonymises the data."*
 
-Not a test bullet — one client rule that reshapes the answers below. 7 days is a ceiling, and it binds every *copy* of the raw record rather than the one in BigQuery. Whatever outlives it must be anonymous. Aggregation is named as the anonymising step, so the *deletable*/*durable* line is a pipeline layer, not a policy document.
 
 **Raw is transient; the irreplaceable copy is the first layer *allowed* to persist.** The instinct runs the other way: raw as the irreplaceable copy, kept longest.
 
@@ -10,7 +7,6 @@ Silver is the source of truth, anonymous and retained indefinitely. Bronze is a 
 
 ## The anonymisation boundary is Silver
 
-**Silver is the layer that has to be durable.** Gold fixes the analysable dimension combinations at design time. Ask it for *fill rate by device on one ad unit during a specific incident* and the rows were already collapsed. Silver's are fixed at query time.
 
 Bronze is too early: stripping fields there means parsing the payload at ingest, which puts back the processing component bullet 1.2 deletes. Gold is too late: Silver is retained indefinitely, so an identifier that reaches Silver persists indefinitely. That leaves Silver, where the mechanism is that the typed schema does not have those columns — an allowlist, not a filter.
 
@@ -22,7 +18,6 @@ Bronze is too early: stripping fields there means parsing the payload at ingest,
 
 ## Every copy of the raw record, named
 
-Two of these are not layers, and the last one is not ours.
 
 | Copy | Expires by | At |
 |---|---|---|
@@ -49,4 +44,3 @@ Three we declare, one we disclose, and beneath the archive one more we switch of
 
 ---
 
-Next: [**1.1 — Architecture Diagram**](/part_1/01-architecture-diagram.md)

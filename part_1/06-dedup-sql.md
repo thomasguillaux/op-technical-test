@@ -2,7 +2,6 @@
 
 *Test bullet: write the SQL query (using a window function) to deduplicate events arriving with the same `event_id` during the Bronze → Silver transition.*
 
-The window function, as asked. Seven lines:
 
 ```sql
 SELECT * EXCEPT (publish_time), publish_time AS ingestion_timestamp
@@ -14,21 +13,10 @@ QUALIFY ROW_NUMBER() OVER (
         ) = 1
 ```
 
-`QUALIFY` filters on a window function without the `SELECT ... FROM (…) WHERE rn = 1` wrapper.
 
-`ORDER BY publish_time DESC` keeps the last copy. Both orderings are defensible; last matches the tie-break the `MERGE` below applies, so one rule holds everywhere.
-
-The filter names `publish_time`, not the alias. `publish_time` is the partitioning column and `require_partition_filter` is set. Silver renames it to `ingestion_timestamp` once, here.
-
-## Alone, it dedups only the batch
-
-Duplicates arrive up to an hour late and Silver runs every 30 minutes, so a duplicate and its original usually land in *different runs*. The window function sees one batch: usually it finds nothing to remove, and inserts a row Silver already holds. Silver counts twice, Gold sums it, the dashboard is quietly wrong. Deduplicating against Silver's existing rows takes a `MERGE ON event_id`.
 
 That does not make the window function optional, and the reason is sharper than *"the `MERGE` would fail"*. Two copies of an `event_id` Silver already holds do fail the run — `UPDATE/MERGE must match at most one source row for each target row`. Two copies of an `event_id` it has never seen match nothing, take `WHEN NOT MATCHED`, and insert twice with no error. That second case is the common one, a same-batch double-send of a new event, and the dangerous one. **The window function makes the `MERGE` legal, and the `MERGE` makes the dedup correct across runs — within the auction day.** It guarantees one row per `event_id` *entering* the reference joins. Non-overlapping `valid_from`/`valid_to` on the revenue-share table guarantees one row *leaving* them. That table's validity windows are a correctness property, not a convenience.
 
-## One model, not one per source
-
-The typing step cannot use one fixed JSON path per field: `price` lives at `$.bid.cpm` for one SSP and `$.price_usd` for another. Payloads differ by source. Converging them is a stated objective. The paths live in a declarative mapping in the Dataform repository, one entry per source, expanded at compile time into one `CASE` per column:
 
 ```sql
 CASE source_id
@@ -37,11 +25,6 @@ CASE source_id
 END AS price
 ```
 
-`${col("price", "NUMERIC")}` in the script below is the template call that emits exactly that. Nothing evaluates it at runtime: BigQuery receives ordinary SQL, identical to the hand-written version. Adding a source is a data change instead of a code change, at no execution cost.
-
-A source with no path for a field, or no beacon for a whole event type, yields `NULL` there and never `0`.
-
-## What actually runs
 
 ```sql
 DECLARE watermark, batch_max TIMESTAMP;
@@ -139,26 +122,8 @@ WHEN NOT MATCHED THEN
 DROP TABLE batch;  -- a multi-statement query's temp table otherwise lingers 24 hours
 ```
 
-## Four choices inside the run
-
-- **One pass over `payload`, and everything else reads the temp table.** Day detection and the `MERGE` both need the typed batch. Bullet 2.2's figures already assume that single pass. Written the obvious way, both re-scan `payload`, the widest \~90% of the row, and those figures double. The table is dropped before the script ends, so no event data outlives the run.
-- **Every read is bounded above by `batch_max`, not only below by the watermark.** Bronze grows while the run executes, so an open-ended predicate means each statement reads a different table — and lets the watermark advance past rows the `MERGE` never saw.
-- **`t.auction_day IN UNNEST(batch_days)` sits in the `ON` clause, and `batch_days` is read from the data.** That line *is* the partition pruning. It works for two reasons a reviewer can check. BigQuery prunes on a script variable, and on a query parameter, because the value is fixed before the statement runs; the same predicate written as a subquery prunes nothing. And this `MERGE` has no `WHEN NOT MATCHED BY SOURCE` branch, the clause that forces a full scan of the target regardless.
-
-  A backfill three days old targets its own partition automatically. A hardcoded "today and yesterday" would scan the wrong partitions *and* miss the duplicates it exists to catch. Where pruning stops, results stay correct and only the bill changes. Silver has no expiration, so the unpruned scan grows forever.
-- **`auction_day` is absent from the `UPDATE SET`, and `SAFE_CAST` plus `WHERE auction_timestamp IS NOT NULL` is the rejects boundary.** A duplicate whose auction day moved is not a duplicate. It is the producer re-stamping on retry while reusing `event_id`, and updating the column would move the row to another partition and hide that bug. `auction_hour` *is* updated, because it derives from a value that should never have changed.
-
-  A row with no usable auction clock is unplaceable rather than incomplete. It diverts to `silver_rejects` as keys and a reason, never a payload. Bronze still holds the payload under the same partition key for the seven days the reject is worth investigating.
-
-## A watermark, saved two minutes behind the ceiling
-
-`WHERE publish_time > watermark` reads every Bronze row ingested since the last *successful* run. A fixed lookback, say 3 hours, has no catch-up mode: a backlog draining on Sunday arrives outside every following window and is skipped for good. The watermark's rule — *process everything not yet processed* — runs a two-day backlog with the same code as a two-minute one.
-
-`publish_time` is stamped by the platform. But *stamped in order* and *appear in order* are different claims, and only the first is true:
 
 > **A message stamped 10:29:58 becomes queryable at 10:30:04.** The subscription writes Bronze in parallel, so the order rows are *stamped* is not the order they *appear*. The 10:30 Silver run had already read; the highest stamp it saw was 10:29:59. Had that become the new line, the 10:29:58 row would have sat behind it forever — merged by nothing, counted by nothing, and no job would have failed.
-
-So the line saved is not the ceiling that was read:
 
 ```sql
 MERGE INTO pipeline_state AS t
@@ -169,19 +134,7 @@ WHEN MATCHED THEN UPDATE SET last_success = s.last_success
 WHEN NOT MATCHED THEN INSERT (model, last_success) VALUES (s.model, s.last_success);
 ```
 
-The overlap costs scan and nothing else: \~7% of the Bronze read, discarded by the `MERGE`. Every write in the run is keyed rather than appended, so failure lands in the direction of doing work twice, never of skipping it.
 
-The watermark lives in a table, one row per model, not in a `SELECT MAX(ingestion_timestamp) FROM ${self()}`. That `MAX` is over a non-partitioned column on a table with `require_partition_filter = TRUE`, so BigQuery refuses to run it. A row also makes the watermark *settable*, so *"reprocess from Tuesday"* is an `UPDATE`, not a code change.
-
-## Day-scoped dedup is a trade, not an oversight
-
-`t.auction_day IN UNNEST(batch_days)` is what makes the `MERGE` cheap, and it is also what limits it: uniqueness in Silver holds under one invariant — every copy of an `event_id` carries the same `auction_day`. Silver holds `event_id = X` at day D4; the producer retries X and re-stamps the auction clock into D5; the `ON` clause looks in D5 only, finds nothing, and inserts a second row under one `event_id`. Bucketing on the auction's clock keeps that rare. `auction_timestamp` is an attribute the producer *carries*, not one it *generates*. Its value is identical on every event of an auction, so a correct producer raises no edge case at midnight: an auction cannot straddle a day boundary no matter when its impression fires. A re-stamping one concentrates there — a drift of a second or two changes nothing at any other hour, and crosses a partition only within seconds of midnight.
-
-Closing the retry gap inside the `MERGE` costs the partition filter. Every run would then match against the whole history of a table with no expiration, 48 times a day, to defend against a bug in someone else's code.
-
-So it is closed by detection instead of prevention: two checks over the last three days — an `event_id` carrying more than one row, and a row whose `auction_timestamp` no longer falls inside its own `auction_day`. Which mark a re-stamp leaves depends on whether the batch also carried the old day. Freezing `auction_day` on `UPDATE` is what leaves the second one, so the checks are the return on that choice — without them it costs consistency and buys nothing. Both prune on the partition column, and three days bounds the scan — neither check reads the full history of a table that never expires.
-
-Empty in steady state. Non-empty names a producer that is re-stamping — and **this repair is the one in the design that is not a rerun.** Reprocessing Bronze yields the later copy, `batch_days` opens the later day, the `MERGE` updates the row already sitting there, and the stale copy in the earlier partition is never looked at. It takes a `DELETE` on Silver, then a Gold rebuild of both days. **The copy it drops is the later-ingested one — the only place in the design where last-write-wins is inverted.** Freezing `auction_day` already made that call: when the auction clock itself moved, the later value is the corrupted one, and the tie-break that keeps the last copy assumes it is the more complete one. Being wrong has to be visible and repairable rather than impossible.
 
 ## Rejected — one line each
 

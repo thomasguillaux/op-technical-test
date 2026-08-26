@@ -2,7 +2,6 @@
 
 *Test bullet: we want to deploy a copilot capable of answering business questions such as: "Why did the eCPM of publisher X drop by 20% yesterday on the video format?"*
 
-**One agent, four tools, our code.** It reads Gold only, and which tool it takes is decided by a property of the question, not its topic: **free-form SQL where a wrong answer gets caught, fixed SQL where it does not.**
 
 | Tool | What it does |
 |---|---|
@@ -17,13 +16,10 @@
 
 **What** — a number, a ranking, a trend — is handled by `run_query`, the model writes it: a wrong number looks wrong to someone who sees it daily. **Why** — a cause, an attribution — by `diagnose_change`, we wrote the SQL.
 
-An explanation cannot be sanity-checked. *"SSP 3 reduced bidding on mobile video"* is specific, plausible, and unverifiable without doing the analysis the analyst delegated. Its specificity makes it *more* convincing, not less.
 
-The uncatchable answer is the one people act on. Nobody changes a floor price because revenue was €12,400; they change it because they believe SSP 3 pulled back. The class with no verification has the largest blast radius.
 
 ## One generated query cannot answer the test's example
 
-The test's own example is an investigation: the delta against D-1, a breakdown by four dimensions, a ranking, and a call on which one matters. Four or five queries and a judgement. The case against pure text-to-SQL is not security; the guardrails of section 3 close that.
 
 A text-to-SQL agent writes one query, gets one number, and narrates a cause — but nothing in the result set told it the cause. It infers from how ad tech usually behaves and presents that as a finding: the failure mode nobody catches, on the exact question the test asked.
 
@@ -33,7 +29,6 @@ Routines only answer questions someone anticipated. *"Which ad units on mobile l
 
 ## The routing objection — enforced by the API, not the prompt
 
-*"Is this a what or a why?"* is itself a model judgement, exposed to the same drift. Misrouting degrades an answer; it does not falsify one. A *why* sent to `run_query` returns one number and a visible under-answer, not a confident wrong cause.
 
 **The routing is enforced by the API, not asked for in the prompt.** `tool_config.function_calling_config.mode = ANY` with `allowed_function_names` — the section Google's docs title *"Forced function calling"* — constrains the model to a named subset. A turn narrowed to `diagnose_change` cannot come back as free SQL.
 

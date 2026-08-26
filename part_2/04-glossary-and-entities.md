@@ -2,42 +2,21 @@
 
 *Test bullet: how do you structure the data dictionary (e.g., via dbt tags, data catalog, or vector database) so that the LLM correctly associates a user's informal language ("how much does site Y make us?") with the right technical entities (publisher_id, ad_unit, gross_revenue)?*
 
-**The dictionary is metadata on the model — the test's first option, minus the dead runtime.** Table and column `description`s in the Dataform SQLX, versioned with the SQL they describe and injected into the prompt whole.
 
-But the test's own example contains two lookups, and they need opposite mechanisms.
 
 | In *"how much does site Y make us?"* | Cardinality | Volatility | Mechanism |
 |---|---|---|---|
 | *"site Y"* — an **entity** | Hundreds of publishers, far more ad units | Changes as business is won and lost | **Queried live** — the `resolve_entity` tool |
 | *"make us"* — a **term** | A few dozen definitions | Changes only when the business changes a definition | **Injected whole** — no retrieval at all |
 
-A single retrieval mechanism over both is what the vector-database option implies. It re-indexes a dimension table for the volatile half and adds retrieval risk to a corpus that already fits.
 
-Retrieval over fifty items retrieves the wrong one sometimes; sending all fifty never does.
 
-## The dictionary lives in the SQLX, because a prompt is not a source of truth
 
-The definitions live where the metric is implemented, in the Dataform `config` block, changed in the same pull request as the SQL they describe. A prompt is a deploy artefact: editable in a file nobody who owns a metric reviews.
 
-Dataform publishes them to BigQuery on every build. `INFORMATION_SCHEMA.COLUMN_FIELD_PATHS` exposes `description` beside `column_name`, and the prompt block assembled at hop 2 is generated from that query at request time. A metric definition cannot drift from the query implementing it, because they are the same file.
 
-**Synonyms live inside the description text, because BigQuery has no field for them:**
 
-> `gross_revenue` — *"what the inventory earned before OptimusAds' share. Also asked as: what a publisher makes, what a site earns, turnover, top line."*
 
-## *"Make us"* is ambiguous, and no dictionary fixes it
 
-Read literally, *"how much does site Y make **us**"* is net revenue — OptimusAds' retained share. The analyst almost always means gross, what the publisher's inventory earned. A synonym list cannot resolve that, because both readings are correct English and only one is intended.
-
-So the mechanism is not a better dictionary. It is the rule from 2.1: the copilot states the definition it used.
-
-> *"Site Y generated €12,400 yesterday — gross revenue, before our share."*
-
-The dictionary makes the model's reading explicit. It does not guarantee the reading is right.
-
-## `resolve_entity` is a query, not an index
-
-`publisher_id` and `ad_unit_id` are already human-readable — the names the Yield team says out loud *are* the values in the column. The lookup needs no mapping table, only a fuzzy match against the live dimension values in the semantic views:
 
 ```sql
 WITH names AS (
@@ -59,13 +38,8 @@ ORDER BY distance
 LIMIT 5
 ```
 
-- **`max_distance => 4` with a filter of `< 4`, not `<= 4`.** `EDIT_DISTANCE` returns `max_distance` when the true distance exceeds it — that is what lets it stop early. A predicate at the cap therefore matches every name in the table. The cap is the performance knob. The filter sits one below it.
-- **`SOUNDEX` catches what Levenshtein does not:** a name heard rather than read, misspelt by more than three characters but pronounced right.
-- **Thirty days is the set of publishers currently transacting.** Widen it and churned names compete with live ones for the match.
 
-**The tool returns ranked candidates, not an answer.** Where more than one scores close, the copilot asks which. Silently picking the nearest produces a confident, well-formed answer about the wrong client, indistinguishable from a right one. Asking costs one turn.
 
-> **A publisher signed this morning, asked about at 15:00.** *"How much does site Y make us?"* resolves, because entity lookup reads the dimension values in the view rather than an index someone would have had to re-embed. A stale index answers *"I don't know that publisher"* about a client the sales team won this week — and nothing about that answer looks like a staleness bug.
 
 **Cost.** The dictionary is a few thousand tokens on every request. `resolve_entity` scans one string column over a 30-day window of a Gold-derived view — cents. The cost worth naming appears on no bill. An embedding pipeline, an index and a re-indexing job are a component to operate and a staleness failure to notice, and neither is a line item.
 
