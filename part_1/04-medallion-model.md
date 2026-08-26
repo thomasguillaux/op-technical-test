@@ -30,7 +30,7 @@ Silver is typed wide, and the retention rule forces it. A narrow Silver is corre
 | `publisher_id` | STRING | no | Envelope |
 | `ingestion_timestamp` | TIMESTAMP | no | Pub/Sub `publish_time`; the `MERGE` tie-break |
 | `auction_timestamp` | TIMESTAMP | no | The auction's clock — stamped once by the wrapper, echoed by every event of the auction |
-| `auction_day` | DATE | no | `DATE(auction_timestamp)` — *partition key* |
+| `auction_day` | DATE | no | `DATE(auction_timestamp)` at first insert, never updated after — *partition key* |
 | `auction_hour` | TIMESTAMP | no | `TIMESTAMP_TRUNC(auction_timestamp, HOUR)` — Gold's grain |
 | `job_insert_timestamp` | TIMESTAMP | no | When this pipeline first wrote the row |
 | `job_update_timestamp` | TIMESTAMP | no | When it last rewrote it — *Gold's change-detection clock* |
@@ -106,7 +106,7 @@ The cadence is set by self-healing, not freshness. A failed run is repaired by t
 
 ### `quality_hour`, the third table
 
-`quality_hour` sits beside the two fact tables, at `auction_hour × publisher_id`. Per hour: how late a publisher's events arrived (`late_beyond_1h`), how many `event_id`s appeared with more than one `auction_timestamp`, and how long auction-to-impression actually takes.
+`quality_hour` sits beside the two fact tables, at `auction_hour × publisher_id`. Per hour: how late a publisher's events arrived (`late_beyond_1h`), how long auction-to-impression actually takes, and how many rows carry a re-stamped `auction_timestamp` — a duplicated `event_id`, or a row whose day disagrees with its partition.
 
 The grain is per publisher because which publisher is late is the actionable content; a total names nobody. It lives in Gold so Part 2's copilot reads it with the access it already has.
 
