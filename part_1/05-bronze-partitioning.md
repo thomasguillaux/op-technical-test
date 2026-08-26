@@ -48,7 +48,7 @@ Silver reads Bronze every 30 minutes, so the grain is priced 48 times a day:
 | **DAY** | \~750 GB (day average) | \~36 TB/day | **\~$6,100/month** |
 | **HOUR** | \~124 GB | \~6 TB/day | **\~$1,000/month** |
 
-## Event date, answered twice
+## Event date, answered by arrival time
 
 **On Bronze, arrival time *is* event date, within two measured hours.** An auction reaches its final state within an hour, and a retry lands at most an hour after the original. Every event dated D therefore arrives between D 00:00 and D+1 02:00 — 26 hourly partitions for a 24-hour day, 8% more than the day itself. At daily grain the same query needs two partitions, 100% more. Lateness is measured hourly and per publisher, so if it worsens the arrival range widens by exactly the measured amount and nothing else moves.
 
