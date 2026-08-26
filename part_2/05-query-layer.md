@@ -2,21 +2,17 @@
 
 *Test bullet: on which BigQuery layer (Bronze, Silver, or Gold) should the LLM agent execute its generated SQL queries? Why?*
 
-**Gold.** It is the only layer where a question has an answer, a definition, and a published verdict on whether that answer is trustworthy.
+**Gold, through its views only — and what makes that the answer is an IAM grant, not a guardrail.** Gold is the only layer where a question has an answer, a definition, and a published verdict on whether that answer is trustworthy. The service account holds `dataViewer` on the semantic dataset alone, and authorized datasets let the views read Gold while the caller cannot. That grant bounds the normal question; a ceiling only bounds the bad one.
 
-
-
+---
 
 ## The mechanism: authorized datasets
-
 
 BigQuery's authorized datasets close it. The semantic dataset is authorized on the Gold dataset, so the views can read the base tables while the caller cannot — per Google's documentation, *"to query a view in an authorized dataset, a user needs to have access to the view, but access to the shared dataset is not required."* The authorization names the dataset, not its views: a view added tomorrow needs no grant of its own.
 
 **The grant in full, because it is checkable:** `roles/bigquery.jobUser` on the project — a query job needs `bigquery.jobs.create` wherever the data lives — and `roles/bigquery.dataViewer` on the semantic dataset alone. **No grant on Bronze, Silver or the Gold base tables exists anywhere for this service account.**
 
-
 ## The same question, priced at three layers
-
 
 | Executed against | What one publisher-slice question scans | Order |
 |---|---|---|

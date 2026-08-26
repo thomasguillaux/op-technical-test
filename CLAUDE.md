@@ -34,11 +34,13 @@ List the folder and read the relevant file before working in that area. Nothing 
 
 ## Write-up rules
 
-The write-up is the docsify site: `introduction.md` + `intro/`, `part1-pipeline.md` + `part_1/`, `part2-llm-agent.md` + `part_2/`. It is the only thing the reviewer sees.
+The write-up is the docsify site: `introduction.md` + `intro/` + `part_1/` + `part_2/`. It is the only thing the reviewer sees.
 
-Those three top-level pages are summary and routing only — the arguments live in the numbered pages beneath them. A new page needs a `_sidebar.md` entry, a row in its parent's routing table, and the `Next:` link on the page before it.
+There is no routing layer. `introduction.md` is the only synthesis — it states the eight load-bearing arguments in full, because a reviewer with thirty minutes must meet them in minute one. Every other page carries its own argument and stands alone when reached from search. A new page needs a `_sidebar.md` entry and the `Next:` link on the page before it.
 
 - **The write-up is self-contained.** Every load-bearing argument is written out on the page that makes the claim. A linked argument is an absent one.
+- **Every page opens with its claim.** ≤80 words in bold, then a rule, then the body. The opener states no claim absent from the body below it. It is the spoken sentence for that page in the oral defence.
+- **Word caps are load-bearing.** The per-page budget is enforced, not aspirational. A page that needs more words needs fewer arguments.
 - **Ordered by the test's bullets, not by our dependency order.** The grader checks boxes in their sequence; matching it is free.
 - Per bullet: the answer flat, the argument compressed (requirement satisfied + alternative beaten), the artifact where one exists (diagram, DDL, SQL, metric table), and the rejected options as a one-line table.
 - **Incident narratives: one per major section, blockquoted, ~5-6 total.** Used where the mechanism is otherwise abstract. Beyond that cap they stay unwritten — spoken ammunition for the defence, not page content.

@@ -2,10 +2,13 @@
 
 *Test bullet: detail the flow between the user, the orchestrator (e.g., LangChain or FastAPI), the model (Vertex AI / Gemini), and the BigQuery database (Text-to-SQL + RAG pattern).*
 
+**Nine hops, FastAPI to Gemini to BigQuery, with no agent framework between them.** The test names LangChain as an example; a framework whose agent entry point moved packages inside a year is a runtime we operate, in a seam we own either way. `tool_config` on the Vertex call enforces the routing a framework would only ask for, and every job we submit carries its own byte ceiling.
+
+---
+
 ![OptimusAds — Yield copilot: flow, guardrails, blast radius](../assets/agent.png)
 
 ## The flow, hop by hop
-
 
 | # | Hop | Mechanism | Latency |
 |---|---|---|---|
@@ -19,13 +22,9 @@
 | 8 | Result → model | `Part.from_function_response(...)` appended to `contents`; the loop returns to hop 3 | ms |
 | 9 | Narration → FastAPI → analyst | Four fields on the same `POST`: the prose, the executed SQL, the rows, and the period's quality verdict | ~1–2 s |
 
-
 **The objection is a dependency one.** We own the seam either way. One of the two ways is a framework whose agent entry point moved packages inside a year. `AgentExecutor` now ships in a separate `langchain-classic` package. `create_agent` is the supported path. This is the argument that removed Dataflow, Composer and dbt Core in Part 1, and Cube and a vector database alongside LangChain in Part 2: *a runtime we operate, placed between us and something we could call directly.*
 
-
-
 **Cost.** BigQuery bytes dominate per question, not tokens, and the ceiling at hop 7 bounds the worst case, not the average. Context caching is not a lever: the minimum cacheable prefix for the Gemini 3 family is 4,096 tokens, below which the dictionary block sits.
-
 
 ## Rejected — one line each
 

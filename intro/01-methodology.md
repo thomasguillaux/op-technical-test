@@ -1,7 +1,5 @@
 # Methodology
 
-
-
 ## Requirements are the input; components are the output
 
 Drawing the boxes named in the test and connecting them produces an architecture nobody can defend, because no component ever had to justify itself. I worked the other way round: the requirement first, then the smallest thing that satisfies it, then an argument for deleting that thing. What is in the diagrams is what survived.
@@ -16,12 +14,9 @@ That is why most sections end with a **Rejected** table. Where a component named
 
 **Record the argument, not the conclusion.** A conclusion alone is worthless the moment it is challenged. Each decision is kept with the requirement it satisfies and the alternative it beats; the Rejected tables are the compressed form of exactly that.
 
-
 ## What is on these pages, and what is not
 
-
 Costs never run through the prose: each page carries its own marked cost paragraph, and the argument above it stands without the figure.
-
 
 ---
 

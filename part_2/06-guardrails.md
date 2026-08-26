@@ -2,7 +2,9 @@
 
 *Test bullet: what guardrails (IAM rights, query quotas, SQL validation) do you plan to put in place to prevent an LLM hallucination from triggering a `SELECT *` on several terabytes of raw data?*
 
-**All three, and the bullet lists them in the reverse of the order they fire.** SQL validation runs first, in our code, before BigQuery is called at all; IAM runs last. Between them sits a fourth the bullet does not name: the dry run, the layer that puts the *engine* rather than the model in charge of the byte estimate.
+**All three the bullet names, in the reverse of the order it lists them — plus a fourth it does not.** Static validation runs first, in our code, before BigQuery is called at all. Then a dry run, which puts the *engine* rather than the model in charge of the byte estimate. Then `maximum_bytes_billed`. Then the IAM grant, last and permanent. Query quotas sit beside this: they bound a day, not a query.
+
+---
 
 | # | Layer | What it stops | Enforced by |
 |---|---|---|---|
@@ -13,15 +15,11 @@
 
 Query quotas are the bullet's middle term and are deliberately not in this table: they bound a *day* of queries, not one query.
 
-
-
 ## Query quotas — the layer that bounds N, not one query
 
 A model in a retry loop is not one job, and neither is ten analysts on a bad afternoon. A hundred queries each individually under the ceiling is a bill no layer above has looked at.
 
 BigQuery's custom quotas close it. `QueryUsagePerUserPerDay` applies per user and per service account, so it caps the copilot's entire day independently of the humans; `QueryUsagePerDay` caps the project. Both are proactive: a query that would exceed the remaining allowance does not run, rather than running and being counted afterwards.
-
-
 
 ## The guarded execution path
 
@@ -76,7 +74,6 @@ def run_query(sql: str, client: bigquery.Client):     # layers 1-2: model-writte
 
     return execute(sql, client)
 ```
-
 
 **Cost.** A dry run consumes no slots and is not billed, so the estimate that prevents the expensive query is itself free. The ceiling and the daily quota are insurance, not levers: they bound the worst query and the worst month, and change the bill only on the day something goes wrong. What moves the monthly total is not on this page — it is the grant in 3.1, which decides what a *normal* question scans.
 

@@ -2,6 +2,9 @@
 
 *Test bullet: write the SQL query (using a window function) to deduplicate events arriving with the same `event_id` during the Bronze → Silver transition.*
 
+**A window function picks the surviving row; the `MERGE` around it makes that choice correct across runs.** `ROW_NUMBER` over `event_id` answers the bullet as written, but a query alone re-inserts duplicates the moment the same Bronze rows are read twice — and re-reading is the normal case here, not the exception, because late data and reruns both replay the same window. The `MERGE` and the watermark it advances are what make that safe.
+
+---
 
 ```sql
 SELECT * EXCEPT (publish_time), publish_time AS ingestion_timestamp
@@ -13,10 +16,7 @@ QUALIFY ROW_NUMBER() OVER (
         ) = 1
 ```
 
-
-
 That does not make the window function optional, and the reason is sharper than *"the `MERGE` would fail"*. Two copies of an `event_id` Silver already holds do fail the run — `UPDATE/MERGE must match at most one source row for each target row`. Two copies of an `event_id` it has never seen match nothing, take `WHEN NOT MATCHED`, and insert twice with no error. That second case is the common one, a same-batch double-send of a new event, and the dangerous one. **The window function makes the `MERGE` legal, and the `MERGE` makes the dedup correct across runs — within the auction day.** It guarantees one row per `event_id` *entering* the reference joins. Non-overlapping `valid_from`/`valid_to` on the revenue-share table guarantees one row *leaving* them. That table's validity windows are a correctness property, not a convenience.
-
 
 ```sql
 CASE source_id
@@ -24,7 +24,6 @@ CASE source_id
   WHEN 'ssp_beta'  THEN SAFE_CAST(JSON_VALUE(payload, '$.price_usd') AS NUMERIC)
 END AS price
 ```
-
 
 ```sql
 DECLARE watermark, batch_max TIMESTAMP;
@@ -122,7 +121,6 @@ WHEN NOT MATCHED THEN
 DROP TABLE batch;  -- a multi-statement query's temp table otherwise lingers 24 hours
 ```
 
-
 > **A message stamped 10:29:58 becomes queryable at 10:30:04.** The subscription writes Bronze in parallel, so the order rows are *stamped* is not the order they *appear*. The 10:30 Silver run had already read; the highest stamp it saw was 10:29:59. Had that become the new line, the 10:29:58 row would have sat behind it forever — merged by nothing, counted by nothing, and no job would have failed.
 
 ```sql
@@ -133,8 +131,6 @@ ON t.model = s.model
 WHEN MATCHED THEN UPDATE SET last_success = s.last_success
 WHEN NOT MATCHED THEN INSERT (model, last_success) VALUES (s.model, s.last_success);
 ```
-
-
 
 ## Rejected — one line each
 

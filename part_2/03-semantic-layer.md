@@ -2,16 +2,15 @@
 
 *Test bullet: AdTech concepts like eCPM, fill rate, gross margin, or Prebid revenue are based on precise calculation formulas. How do you implement a semantic layer (e.g., dbt Semantic Layer, Cube, or dedicated BigQuery views) to ensure the LLM applies the correct calculation rules instead of reinventing its own SQL aggregations?*
 
-**Dedicated BigQuery views — the test's own third option.** Four of them: `v_opportunity_hourly`, `v_opportunity_daily`, `v_ssp_hourly`, `v_ssp_daily`. Every ratio is computed at read time from summed measures, and no ratio is ever stored. **The layer removes the opportunity to get the arithmetic wrong, not the temptation.**
+**Dedicated BigQuery views — the test's own third option.** Four of them: `v_opportunity_hourly`, `v_opportunity_daily`, `v_ssp_hourly`, `v_ssp_daily`. Every ratio is computed at read time from summed measures, and no ratio is ever stored. **The layer removes the opportunity to get the arithmetic wrong, not the temptation.** dbt's Semantic Layer and Cube lose the same way: a service to operate, where a view is an object BigQuery already resolves.
 
+---
 
 ```sql
 SELECT AVG(ecpm) FROM gold_opportunity WHERE publisher_id = 'X'
 ```
 
-
-
-
+`v_opportunity_*`:
 
 | Metric | Definition |
 |---|---|
@@ -23,6 +22,7 @@ SELECT AVG(ecpm) FROM gold_opportunity WHERE publisher_id = 'X'
 | `render_rate` | `impressions / wins` — **`NULL` where `impression_coverage < 1`**, never a partial figure presented as whole |
 | `rpm` | `gross_revenue / auctions * 1000` |
 
+`v_ssp_*`, adding:
 
 | Metric | Definition |
 |---|---|
@@ -30,11 +30,7 @@ SELECT AVG(ecpm) FROM gold_opportunity WHERE publisher_id = 'X'
 | `win_rate` | `wins / (bids + no_bids)` — how often being invited turns into a win |
 | `ecpm`, `gross_margin` | as above, over the impressions this SSP won |
 
-
-
 > **Someone raises floor prices and reports eCPM up 12%.** True, and meaningless: fill rate fell by more, and revenue per opportunity went down. An optimization judged on eCPM alone is judged on a number the change itself manufactured. `rpm` is one line of SQL and it closes the entire category.
-
-
 
 **Cost.** A logical view stores nothing and costs nothing to maintain; what a question pays for is the scan of Gold underneath it, two to three orders of magnitude below the event layers and priced per layer in 3.1. The alternative that costs money is recomputing metrics from the event grain, not a different semantic layer.
 

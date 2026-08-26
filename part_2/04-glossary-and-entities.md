@@ -2,21 +2,16 @@
 
 *Test bullet: how do you structure the data dictionary (e.g., via dbt tags, data catalog, or vector database) so that the LLM correctly associates a user's informal language ("how much does site Y make us?") with the right technical entities (publisher_id, ad_unit, gross_revenue)?*
 
+**Two vocabularies, two mechanisms, split on volatility.** A few dozen metric definitions change only when the business changes them, so the dictionary is injected whole and never retrieved. Hundreds of publisher and ad-unit names change as business is won and lost, so they are resolved live against the dimension values themselves. A vector database is rejected because the client's data carries no free text for semantic search to search.
 
+---
 
 | In *"how much does site Y make us?"* | Cardinality | Volatility | Mechanism |
 |---|---|---|---|
 | *"site Y"* — an **entity** | Hundreds of publishers, far more ad units | Changes as business is won and lost | **Queried live** — the `resolve_entity` tool |
 | *"make us"* — a **term** | A few dozen definitions | Changes only when the business changes a definition | **Injected whole** — no retrieval at all |
 
-
-
-
-
-
-
-
-
+`resolve_entity`, in full:
 
 ```sql
 WITH names AS (
@@ -37,9 +32,6 @@ WHERE distance < 4
 ORDER BY distance
 LIMIT 5
 ```
-
-
-
 
 **Cost.** The dictionary is a few thousand tokens on every request. `resolve_entity` scans one string column over a 30-day window of a Gold-derived view — cents. The cost worth naming appears on no bill. An embedding pipeline, an index and a re-indexing job are a component to operate and a staleness failure to notice, and neither is a line item.
 

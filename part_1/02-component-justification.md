@@ -2,6 +2,10 @@
 
 *Test bullet: justify the use of the chosen components (Pub/Sub, Dataflow/Beam, Cloud Storage, BigQuery, Airflow/Composer).*
 
+**Three of the five named components are kept and two are rejected, on one sentence: no component sits between us and something we could call directly.** Pub/Sub, Cloud Storage and BigQuery each do work nothing else does. Dataflow would move five values from inside a JSON object to beside it; Composer would schedule a DAG with one system in it. Each rejection carries the condition that reinstates it.
+
+---
+
 | Named in the test | Verdict | Why |
 |---|---|---|
 | **Pub/Sub** | Kept | A buffer that survives a weekend outage, a clock no publisher can forge, and a topic schema that refuses a broken envelope at publish — a missing field is an error returned to the caller's own retry logic, not a NULL in a cluster key we find later by watching a queue |
@@ -10,22 +14,13 @@
 | **Dataflow / Beam** | **Rejected** — condition to reinstate stated | The only work it would do is move five values from inside a JSON object to beside it |
 | **Airflow / Composer** | **Rejected** — Dataform instead | Right for a mixed DAG. This DAG has one system in it |
 
-
-**Six components lost to the same sentence: *a runtime we operate, placed between us and something we could call directly.*** Three here; Cube, LangChain and a vector database in Part 2. One rule applied six times is a design; six separate verdicts would be taste.
+**Six components lost to the same sentence: *a runtime we operate, placed between us and something we could call directly.***
 
 ## Cloud Storage: Standard class, not Archive
 
-
 **Cost.** Export subscriptions bill $50/TiB, and this topic carries \~41 TiB/month: the second one is \~$2,100/month plus \~$210 storage — flat, with no growth line, because the window is fixed.
 
-## Dataflow / Beam — rejected
-
-
-## Airflow / Composer — rejected, Dataform instead
-
-
 ## Every copy of the raw record, named
-
 
 | Copy | Expires by | At |
 |---|---|---|
@@ -39,6 +34,7 @@ Three we declare, one we disclose, and beneath the archive one more we switch of
 **The answer to an auditor on the last row is that number, not a denial.** No query of ours can read that residue, no process of ours can pause it, and no request of ours can extend it. It expires on a clock the storage engine runs.
 
 **Cost.** Bronze's 7 days are \~$200/month against \~$2,500 at 90 days. The residue in the last row costs nothing. Bronze bills logically, and logical billing does not charge for time-travel or fail-safe bytes. Bullet 2.2 shows why an expiring table takes that setting. The GCS archive holds the same week for \~$210.
+
 ## Rejected — one line each
 
 | Option | Why not |
