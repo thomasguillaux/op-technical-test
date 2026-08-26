@@ -32,7 +32,7 @@
 |---|---|
 | **Vertex AI Agent Runtime** (ex Agent Engine) | Managed hosting, sessions and memory for a stateless single-turn call with four tools; also pins the service to Python |
 | **Google ADK** | The same objection one layer closer to Google: a framework above a call we make in one line |
-| **Looker + LookML**, even already in place | Its agent is documented as not supporting correlation questions — the test's own example. And reaching LookML from our loop means the Open SQL Interface: `SELECT` only, no `JOIN`, and the job runs on Looker's connection, leaving nothing of ours to carry the dry run, the ceiling or the grant |
+| **Looker + LookML**, even already in place | Its Known limitations list correlation and anomaly detection as unsupported. And reaching LookML from our loop means the Open SQL Interface: `SELECT` only, no `JOIN`, and the job runs on Looker's connection, leaving nothing of ours to carry the dry run, the ceiling or the grant |
 | **Streaming model tokens to the user** | The answer is checkable only once the SQL and numbers arrive with it; a streamed narration is read before either exists |
 | **A custom web UI for the ten analysts** | A fifth component in a four-participant flow, serving a cross-check the four response fields already carry |
 
