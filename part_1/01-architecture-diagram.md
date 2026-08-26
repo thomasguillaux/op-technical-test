@@ -21,7 +21,7 @@
 | 7 | Gold → semantic views → BI, and the Part 2 agent | BigQuery views, each metric formula written once; daily is a view over the hourly table. The agent reads the same views, not its own SQL over the tables | query time |
 | 8 | Silver → `quality_hour` | **Dataform**, on its own tag and schedule. It judges the data the build path produced | hourly, plus a daily tier |
 
-A **monitor** is a Dataform action on the quality tag. Its failure reaches the same log-based alert and blocks nothing. Two rows below are Cloud Monitoring policies instead, because their inputs are native Pub/Sub metrics and no SQL can reach them. The split is dependency wiring, not two systems.
+A **monitor** is a Dataform action on the quality tag. Its failure reaches the same log-based alert and blocks nothing. Two monitors are Cloud Monitoring policies instead — dead-letter depth at hop 4, and delivery reconciliation below — because their inputs are native Pub/Sub metrics and no SQL can reach them. The split is dependency wiring, not two systems.
 
 An **assertion** is a Dataform action that fails, blocking the *Gold* rebuild and never the Silver run. A gate upstream of Silver would stall anonymisation and run the 7-day clock down on data nobody can rebuild.
 

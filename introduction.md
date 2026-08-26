@@ -18,15 +18,15 @@ Everything else on these pages is detail, cost, or a rejected alternative.
 
 **4. Two fact tables, not one, because there are two denominators.** `auctions` for sell-through; `bids + no_bids` for whether an SSP is worth keeping. One table keyed by SSP cannot hold the first: an auction opens before any SSP is involved. Argued in [2.1](/part_1/04-medallion-model.md).
 
-**8. An allowlist fails closed where a stripping filter fails open.** Silver's typed schema *is* the anonymisation boundary — the mechanism is that the columns do not exist, not that a job removes them, so an identifier nobody has classified never reaches Silver. Argued in [2.1](/part_1/04-medallion-model.md).
+**5. An allowlist fails closed where a stripping filter fails open.** Silver's typed schema *is* the anonymisation boundary — the mechanism is that the columns do not exist, not that a job removes them, so an identifier nobody has classified never reaches Silver. Argued in [2.1](/part_1/04-medallion-model.md).
 
 ### Part 2 — the copilot
 
-**5. The split is whether a wrong answer can be caught by the person receiving it.** The model writes SQL for *what* — a number, a ranking, a trend — and none for *why*. A cause is not in the result set; a model asked for one infers from how ad tech usually behaves and presents that as a finding. Argued in [1.1](/part_2/01-question-classes.md).
+**6. The split is whether a wrong answer can be caught by the person receiving it.** The model writes SQL for *what* — a number, a ranking, a trend — and none for *why*. A cause is not in the result set; a model asked for one infers from how ad tech usually behaves and presents that as a finding. Argued in [1.1](/part_2/01-question-classes.md).
 
-**6. The largest cost control in Part 2 is an IAM grant, not a guardrail.** Guardrails bound the bad case. The grant — `dataViewer` on the semantic dataset alone — bounds the normal one, which is the one that runs thousands of times. Argued in [3.1](/part_2/05-query-layer.md).
+**7. The largest cost control in Part 2 is an IAM grant, not a guardrail.** Guardrails bound the bad case. The grant — `dataViewer` on the semantic dataset alone — bounds the normal one, which is the one that runs thousands of times. Argued in [3.1](/part_2/05-query-layer.md).
 
-**7. Trustworthiness is a property of the pipeline, not of the prompt.** The copilot reads `is_settled` and the published quality verdict rather than judging its own input. The pipeline says whether an hour is complete; the model is never asked to guess. Argued in [1.1](/part_2/01-question-classes.md) and [2.1](/part_1/04-medallion-model.md).
+**8. Trustworthiness is a property of the pipeline, not of the prompt.** The copilot reads `is_settled` and the published quality verdict rather than judging its own input. The pipeline says whether an hour is complete; the model is never asked to guess. Argued in [1.1](/part_2/01-question-classes.md) and [2.1](/part_1/04-medallion-model.md).
 
 ## Before the bullets
 
