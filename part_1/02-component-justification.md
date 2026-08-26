@@ -20,6 +20,14 @@
 
 **Cost.** Export subscriptions bill $50/TiB, and this topic carries \~41 TiB/month: the second one is \~$2,100/month plus \~$210 storage — flat, with no growth line, because the window is fixed.
 
+## Dataflow / Beam — rejected
+
+**Dataflow is right when the transformation cannot be expressed as a query over data the warehouse can already read** — no job here qualifies, and the condition that reinstates it is precise: the producer refuses to emit the field split, at which point a streaming job does it and nothing downstream changes.
+
+## Airflow / Composer — rejected, Dataform instead
+
+Airflow is right for a mixed DAG; **Composer's price for this one is a scheduler, a web server and a DAG processor billed continuously whether a DAG fires or not** — where Dataform is free, Google-operated, and compiles the dependency edge out of the SQL itself.
+
 ## Every copy of the raw record, named
 
 | Copy | Expires by | At |
