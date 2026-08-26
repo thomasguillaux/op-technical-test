@@ -16,6 +16,8 @@ That is why most sections end with a **Rejected** table. Where a component named
 
 ## What is on these pages, and what is not
 
+Every page opens with its claim in one bold sentence, then a rule, then the argument — a reviewer who reads only the openers has the design.
+
 Costs never run through the prose: each page carries its own marked cost paragraph, and the argument above it stands without the figure.
 
 ---

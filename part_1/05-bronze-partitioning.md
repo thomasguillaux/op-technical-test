@@ -2,7 +2,7 @@
 
 *Test bullet: configure partitioning and clustering on the Bronze table to minimize execution cost while keeping queries on `publisher_id`, `ssp_id` and event date fast.*
 
-**Partitioned by date, as the test asks — on `publish_time`, at hourly grain.** `publish_time` is the only clock no publisher can write to. Hourly rather than daily because Silver reads Bronze 48 times a day, and at daily grain every run rescans the whole day: \~$6,100/month against \~$1,000. Clustering is `publisher_id, ssp_id, event_type`, prefix-ordered, so the key filtered most often and most selectively sits first.
+**Partitioned by date, as the test asks — on `publish_time`, at hourly grain.** `publish_time` is the only clock no publisher can write to. Hourly rather than daily because Silver reads Bronze 48 times a day, and at daily grain every run rescans the whole day — six times the bytes. Clustering is `publisher_id, ssp_id, event_type`, prefix-ordered, so the key filtered most often and most selectively sits first.
 
 ---
 
