@@ -66,9 +66,9 @@ The obvious design is one fact table at SSP grain. It cannot hold `auctions`, th
 
 ## The anonymisation boundary is Silver
 
-**Raw is transient; the irreplaceable copy is the first layer *allowed* to persist.** The instinct runs the other way: raw as the irreplaceable copy, kept longest.
+**Raw is transient; the irreplaceable copy is the first layer *allowed* to persist.** The instinct runs the other way: raw as the irreplaceable copy, kept longest. Aggregation is named as the anonymising step, so the *deletable*/*durable* line is a pipeline layer, not a policy document.
 
-Silver is the source of truth, anonymous and retained indefinitely. Bronze is a landing and replay buffer whose window we do not control.
+Silver is the source of truth, anonymous and retained indefinitely; Bronze is a landing and replay buffer whose window we do not control. **Silver is the layer that has to be durable** because Gold fixes the analysable dimension combinations at design time: ask it for *fill rate by device on one ad unit during a specific incident* and the rows were already collapsed. Silver's are fixed at query time.
 
 Bronze is too early: stripping fields there means parsing the payload at ingest, which puts back the processing component bullet 1.2 deletes. Gold is too late: Silver is retained indefinitely, so an identifier that reaches Silver persists indefinitely. That leaves Silver, where the mechanism is that the typed schema does not have those columns — an allowlist, not a filter.
 
