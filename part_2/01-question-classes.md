@@ -15,9 +15,7 @@
 
 ## Catchability, and the rule it produces
 
-*Can the person receiving the answer catch it when it is wrong?* Catchability is a property of the question type, not the person.
-
-**What** — a number, a ranking, a trend — is handled by `run_query`, the model writes it: a wrong number looks wrong to someone who sees it daily. **Why** — a cause, an attribution — by `diagnose_change`, we wrote the SQL.
+*Can the person receiving the answer catch it when it is wrong?* Catchability is a property of the question type, not the person. **What** goes to `run_query`, and the model writes the SQL. **Why** goes to `diagnose_change`, whose SQL we wrote.
 
 ## One generated query cannot answer the test's example
 

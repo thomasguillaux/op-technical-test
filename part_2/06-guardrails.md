@@ -2,7 +2,7 @@
 
 *Test bullet: what guardrails (IAM rights, query quotas, SQL validation) do you plan to put in place to prevent an LLM hallucination from triggering a `SELECT *` on several terabytes of raw data?*
 
-**All three the bullet names, in the reverse of the order it lists them — plus a fourth it does not.** Static validation runs first, in our code, before BigQuery is called at all. Then a dry run, which puts the *engine* rather than the model in charge of the byte estimate. Then `maximum_bytes_billed`. Then the IAM grant, last and permanent. Query quotas sit beside this: they bound a day, not a query.
+**All three the bullet names, in the reverse of the order it lists them — plus two it does not.** Static validation runs first, in our code, before BigQuery is called at all. Then a dry run, which puts the *engine* rather than the model in charge of the byte estimate. Then `maximum_bytes_billed`. Then the IAM grant, last and permanent. Query quotas sit beside this: they bound a day, not a query.
 
 ---
 

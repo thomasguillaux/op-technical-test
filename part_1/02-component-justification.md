@@ -16,6 +16,8 @@
 
 ## Cloud Storage: Standard class, not Archive
 
+**Archive bills a 365-day minimum per object and charges for retrieval; the window here is 7 days, and the replay path reads this copy.** Standard has neither.
+
 **Cost.** Export subscriptions bill $50/TiB, and this topic carries \~41 TiB/month: the second one is \~$2,100/month plus \~$210 storage — flat, with no growth line, because the window is fixed.
 
 ## Dataflow / Beam — rejected
