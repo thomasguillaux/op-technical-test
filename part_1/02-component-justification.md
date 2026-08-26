@@ -35,9 +35,9 @@ Airflow is right for a mixed DAG; **Composer's price for this one is a scheduler
 | **GCS archive** | bucket lifecycle rule, with soft-delete retention set to **0**: the default puts every lifecycle-deleted object in a 7-day holding area behind it | 7 days |
 | **Bronze time travel, then fail-safe** | `max_time_travel_hours = 48`, BigQuery's minimum, then a fixed 7-day fail-safe that cannot be configured, queried, or shortened | **day 16** at the earliest |
 
-Three of the four are declared, by Terraform or as a table property; the fourth cannot be configured at all. Beneath the archive, GCS soft delete is switched off. None of them is a job that has to run.
+Three of the four are declared — in Terraform, as a table property, and as a bucket lifecycle rule — and beneath the archive GCS soft delete is switched off. None of the four is a job that has to run.
 
-**The last row is disclosed rather than denied: raw payload survives in fail-safe until day 16.** No query of ours can read that residue, no process of ours can pause it, and no request of ours can extend it. It expires on a clock the storage engine runs.
+**The fourth is disclosed rather than denied: raw payload survives in time travel, then fail-safe, until day 16.** No query of ours can read that residue, no process of ours can pause it, and no request of ours can extend it. It expires on a clock the storage engine runs.
 
 **Cost.** Bronze's 7 days are \~$200/month against \~$2,500 at 90 days. The residue in the last row costs nothing. Bronze bills logically, and logical billing does not charge for time-travel or fail-safe bytes. Bullet 2.2 shows why an expiring table takes that setting. The GCS archive holds the same week for \~$210.
 
