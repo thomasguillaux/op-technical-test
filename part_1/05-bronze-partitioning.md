@@ -62,6 +62,8 @@ Beyond that, event-date analysis belongs in Silver, partitioned on `auction_day`
 
 ## Clustering order is not free
 
+Partition grain is set by Silver's read, which names no publisher. The cluster keys are set by the other query — a human investigating one publisher's Tuesday, filtering `publisher_id` and an arrival range to read raw payloads in the only week they still exist. **Two queries, two knobs.**
+
 BigQuery clustering is *prefix-ordered*: rows sort by the first key, then by the second inside it. Position 1 goes to the column filtered most often and most selectively.
 
 | Position | Key | Why here |
