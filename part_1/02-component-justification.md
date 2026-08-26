@@ -2,6 +2,10 @@
 
 *Test bullet: justify the use of the chosen components (Pub/Sub, Dataflow/Beam, Cloud Storage, BigQuery, Airflow/Composer).*
 
+**Three of the five named components are kept and two are rejected, on one sentence: no component sits between us and something we could call directly.** Pub/Sub, Cloud Storage and BigQuery each do work nothing else does. Dataflow would move five values from inside a JSON object to beside it; Composer would schedule a DAG with one system in it. Each rejection carries the condition that reinstates it. **Choosing components also fixes how many copies of the raw record exist**, so the four the 7-day rule binds are counted below.
+
+---
+
 | Named in the test | Verdict | Why |
 |---|---|---|
 | **Pub/Sub** | Kept | A buffer that survives a weekend outage, a clock no publisher can forge, and a topic schema that refuses a broken envelope at publish — a missing field is an error returned to the caller's own retry logic, not a NULL in a cluster key we find later by watching a queue |
@@ -10,61 +14,34 @@
 | **Dataflow / Beam** | **Rejected** — condition to reinstate stated | The only work it would do is move five values from inside a JSON object to beside it |
 | **Airflow / Composer** | **Rejected** — Dataform instead | Right for a mixed DAG. This DAG has one system in it |
 
-Two components the test does not name: **Dataform**, argued below, and **Cloud Logging → Cloud Monitoring**.
-
-**Six components lost to the same sentence: *a runtime we operate, placed between us and something we could call directly.*** Three here; Cube, LangChain and a vector database in Part 2. One rule applied six times is a design; six separate verdicts would be taste.
+**Six components lost to the same sentence: *a runtime we operate, placed between us and something we could call directly.***
 
 ## Cloud Storage: Standard class, not Archive
-
-| Class | $/GB/month | Minimum duration | Retrieval fee |
-|---|---|---|---|
-| **Standard** | **\~$0.020** | **none** | **none** |
-| Nearline | \~$0.010 | 30 days | $0.01/GB |
-| Archive | \~$0.0012 | 365 days | $0.05/GB |
-
-*Single-region list prices.* Standard is chosen on minimum duration, not on per-GB price. Archive is the reflex, but its 365-day minimum means deleting at 7 days still bills 365 days of accumulation, forever: \~547 TB permanently on the invoice for the 10.5 TB actually held, \~$657/month against \~$210.
-
-**The cheapest per-byte class is the most expensive in practice, by \~3×.** Standard also has no retrieval fee on the replay the copy exists to serve. Retention shorter than the minimum inverts cold-tier economics.
 
 **Cost.** Export subscriptions bill $50/TiB, and this topic carries \~41 TiB/month: the second one is \~$2,100/month plus \~$210 storage — flat, with no growth line, because the window is fixed.
 
 ## Dataflow / Beam — rejected
 
-> Dataflow is right when the transformation cannot be expressed as a query over data the warehouse can already read.
-
-Every candidate job here fails that test:
-
-| Candidate job | Why it is not Dataflow |
-|---|---|
-| Field split on the hot path | The producer supplies the split |
-| Replay from the GCS archive | BigLake reads the objects in place — replay is `INSERT … SELECT` |
-| Large Bronze → Silver backfill | The same Dataform model over more partitions |
-| Per-source schema normalisation | A field-path lookup per source is a `CASE` over data BigQuery already holds |
-| PII stripping at ingest | Stripping is a denylist; a typed Silver schema is an allowlist. A new identifier an SSP starts sending next quarter passes straight through the first |
-
-The last row is the serious one: raw is deleted in 7 days, so identifiers would have to be stripped before they land.
-
-It fails on the quality of the control, not on cost. A denylist enforced by a running process rather than by a table definition means a bug destroys data on the only copy, with no undo — the same constraint that argues for Dataflow is what makes it dangerous.
-
-The two paths overlap across the range: two native export subscriptions (\~$140/TiB) against a standard subscription plus the Storage Write API (\~$105/TiB) plus Dataflow compute. Cost does not decide it. Operational surface does — a streaming job is a deployed service where a subscription is a configuration, and Beam plus SQL means two homes for business logic.
-
-*What brings it back:* the producer refuses to emit the split. Then a streaming Dataflow job does it and nothing downstream changes. Asking their collector for a message format is not asking for analytical work — it already routes on `publisher_id` and `event_type`. Asking *SSPs* to agree on field semantics is a different ask, unavailable at any price, which is why schema convergence is solved in Silver.
+**Dataflow is right when the transformation cannot be expressed as a query over data the warehouse can already read** — no job here qualifies, and the condition that reinstates it is precise: the producer refuses to emit the field split, at which point a streaming job does it and nothing downstream changes.
 
 ## Airflow / Composer — rejected, Dataform instead
 
-Airflow is right for a mixed DAG: trigger a job, wait for an object, call a vendor API, load a warehouse. Once the subscriptions have landed the data, this pipeline's whole job list is: version the SQL, know that Gold depends on Silver, run four schedules, alert on failure, allow a rerun. Nothing event-driven, no branching, nothing outside BigQuery. **Composer's price for that list is a scheduler, a web server and a DAG processor billed continuously whether a DAG fires or not, plus Airflow major-version upgrades we own.**
+Airflow is right for a mixed DAG; **Composer's price for this one is a scheduler, a web server and a DAG processor billed continuously whether a DAG fires or not** — where Dataform is free, Google-operated, and compiles the dependency edge out of the SQL itself.
 
-Dataform: SQLX in Git, dependencies declared in the code, release configurations as the deploy artefact, workflow configurations as the schedule, assertions as the quality checks. Google operates it, it is free, and we pay only for the BigQuery it consumes. `${ref("silver_events")}` compiles the table name *and* creates the dependency edge, so the two cannot drift apart — unlike a DAG file sitting next to its SQL.
+## Every copy of the raw record, named
 
-Its three real gaps:
+| Copy | Expires by | At |
+|---|---|---|
+| **Pub/Sub backlog**, and the dead-letter topic with it | subscription retention on both, declared in Terraform — 7 days is also the default, so the control is the review, not the value | 7 days |
+| **Bronze table** | `partition_expiration_days` — a table property, not a job that has to run | 7 days |
+| **GCS archive** | bucket lifecycle rule, with soft-delete retention set to **0**: the default puts every lifecycle-deleted object in a 7-day holding area behind it | 7 days |
+| **Bronze time travel, then fail-safe** | `max_time_travel_hours = 48`, BigQuery's minimum, then a fixed 7-day fail-safe that cannot be configured, queried, or shortened | **day 16** at the earliest |
 
-| Dataform gap | Why it does not bite here |
-|---|---|
-| No retry mechanism | The watermark advances only on success, so the next scheduled run *is* the retry |
-| A run is skipped if the previous is still going | Silver reads everything since the last successful watermark, so the next run covers 60 minutes instead of 30, identically. A skip creates no workflow invocation and so emits no failure log — what catches it is the watermark-age monitor of bullet 1.1, which is why that monitor exists |
-| Orchestrates nothing outside BigQuery | The only work outside BigQuery is GCS replay: rare, human-initiated, a runbook rather than a schedule. The reference data Silver joins is *declared*, not loaded — external tables read in place, so nothing fetches and nothing waits |
+Three we declare, one we disclose, and beneath the archive one more we switch off. None of the four is a job that has to run.
 
-Orchestration exists here: dependency resolution, scheduling, release management, quality gating. It is not a separate product to operate.
+**The answer to an auditor on the last row is that number, not a denial.** No query of ours can read that residue, no process of ours can pause it, and no request of ours can extend it. It expires on a clock the storage engine runs.
+
+**Cost.** Bronze's 7 days are \~$200/month against \~$2,500 at 90 days. The residue in the last row costs nothing. Bronze bills logically, and logical billing does not charge for time-travel or fail-safe bytes. Bullet 2.2 shows why an expiring table takes that setting. The GCS archive holds the same week for \~$210.
 
 ## Rejected — one line each
 
@@ -79,6 +56,9 @@ Orchestration exists here: dependency resolution, scheduling, release management
 | **BigQuery scheduled queries** | No dependency graph, and SQL living only in a console object contradicts the core of this design |
 | **Pub/Sub retention alone, no GCS copy** | Not cheaper: retained messages bill at \$0.27/GiB-month, \~$2,640 for the same week against \~$210 in GCS Standard. And a replay is a re-ingest, so you cannot look at it without spending it |
 | **GCS + BigLake as primary store** | No `MERGE`, no real pruning, no clustering |
+| **Backlog retention at Pub/Sub's 31-day maximum** | A deeper buffer is a longer-lived copy of the raw record. Replay past day 7 has nothing to replay *into* — Bronze is gone — so the depth breaches the ceiling and buys nothing |
+| **Leaving GCS soft delete at its 7-day default** | Turns a 7-day lifecycle rule into a 14-day one, invisibly, on the copy the rule binds hardest |
+| **Time travel at BigQuery's 7-day default** | **Five** extra days of queryable raw payload past expiry — pushing the last row from day 16 to day 21 — to protect a table that is immutable and already archived to GCS |
 
 ---
 

@@ -2,8 +2,7 @@
 - [Introduction](/introduction.md)
   - [Methodology](/intro/01-methodology.md)
   - [Business assumptions](/intro/02-business-assumptions.md)
-- [Part 1 — Data Pipeline](/part1-pipeline.md)
-  - [Retention & Anonymisation](/part_1/00-retention-anonymisation.md)
+- Part 1 — Data Pipeline
   - Global Architecture
     - [1.1 Architecture Diagram](/part_1/01-architecture-diagram.md)
     - [1.2 Component Justification](/part_1/02-component-justification.md)
@@ -12,7 +11,7 @@
     - [2.1 Medallion Model](/part_1/04-medallion-model.md)
     - [2.2 Bronze Partitioning & Clustering](/part_1/05-bronze-partitioning.md)
     - [2.3 Deduplication, Bronze → Silver](/part_1/06-dedup-sql.md)
-- [Part 2 — LLM Agent](/part2-llm-agent.md)
+- Part 2 — LLM Agent
   - AI Agent Architecture
     - [1.1 Copilot Scope & Question Classes](/part_2/01-question-classes.md)
     - [1.2 User → Orchestrator → Model → BigQuery](/part_2/02-agent-flow.md)
