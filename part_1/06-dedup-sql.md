@@ -188,6 +188,7 @@ So it is closed by detection instead of prevention: the quality job counts the `
 | **`SELECT DISTINCT` / `GROUP BY event_id`** | No tie-break rule, and no way to express "keep the later copy" |
 | **A wall-clock ceiling — `CURRENT_TIMESTAMP()` at the start of the run** | Simpler, and wrong: a message stamped before the ceiling can surface after it and land behind the line. A ceiling read from the data is a value we have seen; a clock reading is a prediction |
 | **Dedup at ingest, before Bronze** | Needs \~10 GB of live keyed state on the hot path to hold a 1h window at 23k/s, and lets duplicates through *silently* when that state is lost, where the `MERGE` fails loudly and can be rerun |
+| **Bound the target on `ingestion_timestamp`, or a rolling last-N-days window** | Not the partition column, so it prunes nothing and `require_partition_filter` rejects it — and anchored to now, it misses every backfill's duplicates |
 | **`CAST` instead of `SAFE_CAST`** | One malformed value fails the whole run instead of one row |
 | **Push convergence to the producers** | The right answer when it is available, and it is not: the SSPs are third parties. We can demand an *envelope format* from our own collector; we cannot demand *field semantics* from them |
 | **One SQLX model per source** | Copy-pastes the `MERGE`, the watermark and the assertions N times, so a dedup fix has to land in every copy |
