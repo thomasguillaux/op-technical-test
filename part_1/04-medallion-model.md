@@ -16,8 +16,6 @@
 
 ## Silver — types, deduplicates, anonymises
 
-Silver is typed wide, so dimension combinations stay open at query time; Gold is aggregated narrow, to the grain the questions are asked in.
-
 | Column | Type | Null? | Note |
 |---|---|---|---|
 | `event_id` | STRING | no | Dedup key. Envelope |
