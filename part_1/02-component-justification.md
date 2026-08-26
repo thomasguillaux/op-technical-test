@@ -77,7 +77,7 @@ Orchestration exists here: dependency resolution, scheduling, release management
 | **Composer / Airflow** | Right for a mixed DAG; this one has a single system in it. Kept as a future option: Dataform's API lets us add it later |
 | **dbt Core** | Its main argument is portability, and the stack is required to be single-warehouse. What remains is a Python runtime we patch, to submit SQL that BigQuery runs anyway |
 | **BigQuery scheduled queries** | No dependency graph, and SQL living only in a console object contradicts the core of this design |
-| **Pub/Sub retention alone, no GCS copy** | Not cheaper: retained messages bill at \$0.27/GiB-month, \~$2,580 for the same week against \~$210 in GCS Standard. And a replay is a re-ingest, so you cannot look at it without spending it |
+| **Pub/Sub retention alone, no GCS copy** | Not cheaper: retained messages bill at \$0.27/GiB-month, \~$2,640 for the same week against \~$210 in GCS Standard. And a replay is a re-ingest, so you cannot look at it without spending it |
 | **GCS + BigLake as primary store** | No `MERGE`, no real pruning, no clustering |
 
 ---
