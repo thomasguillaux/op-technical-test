@@ -91,4 +91,4 @@ def run_query(sql: str, client: bigquery.Client):     # layers 1-2: model-writte
 
 ---
 
-Part 2 complete. Back to [**the section index**](/part2-llm-agent.md), or [**Part 1 — Data Pipeline**](/part1-pipeline.md).
+Part 2 complete. Back to [**the introduction**](/introduction.md).

@@ -24,6 +24,21 @@
 ## Airflow / Composer — rejected, Dataform instead
 
 
+## Every copy of the raw record, named
+
+
+| Copy | Expires by | At |
+|---|---|---|
+| **Pub/Sub backlog**, and the dead-letter topic with it | subscription retention on both, declared in Terraform — 7 days is also the default, so the control is the review, not the value | 7 days |
+| **Bronze table** | `partition_expiration_days` — a table property, not a job that has to run | 7 days |
+| **GCS archive** | bucket lifecycle rule, with soft-delete retention set to **0**: the default puts every lifecycle-deleted object in a 7-day holding area behind it | 7 days |
+| **Bronze time travel, then fail-safe** | `max_time_travel_hours = 48`, BigQuery's minimum, then a fixed 7-day fail-safe that cannot be configured, queried, or shortened | **day 16** at the earliest |
+
+Three we declare, one we disclose, and beneath the archive one more we switch off. None of the four is a job that has to run.
+
+**The answer to an auditor on the last row is that number, not a denial.** No query of ours can read that residue, no process of ours can pause it, and no request of ours can extend it. It expires on a clock the storage engine runs.
+
+**Cost.** Bronze's 7 days are \~$200/month against \~$2,500 at 90 days. The residue in the last row costs nothing. Bronze bills logically, and logical billing does not charge for time-travel or fail-safe bytes. Bullet 2.2 shows why an expiring table takes that setting. The GCS archive holds the same week for \~$210.
 ## Rejected — one line each
 
 | Option | Why not |
@@ -37,6 +52,9 @@
 | **BigQuery scheduled queries** | No dependency graph, and SQL living only in a console object contradicts the core of this design |
 | **Pub/Sub retention alone, no GCS copy** | Not cheaper: retained messages bill at \$0.27/GiB-month, \~$2,640 for the same week against \~$210 in GCS Standard. And a replay is a re-ingest, so you cannot look at it without spending it |
 | **GCS + BigLake as primary store** | No `MERGE`, no real pruning, no clustering |
+| **Backlog retention at Pub/Sub's 31-day maximum** | A deeper buffer is a longer-lived copy of the raw record. Replay past day 7 has nothing to replay *into* — Bronze is gone — so the depth breaches the ceiling and buys nothing |
+| **Leaving GCS soft delete at its 7-day default** | Turns a 7-day lifecycle rule into a 14-day one, invisibly, on the copy the rule binds hardest |
+| **Time travel at BigQuery's 7-day default** | **Five** extra days of queryable raw payload past expiry — pushing the last row from day 16 to day 21 — to protect a table that is immutable and already archived to GCS |
 
 ---
 

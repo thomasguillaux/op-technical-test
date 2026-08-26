@@ -150,4 +150,4 @@ WHEN NOT MATCHED THEN INSERT (model, last_success) VALUES (s.model, s.last_succe
 
 ---
 
-Part 1 complete. Next: [**Part 2 — LLM Agent**](/part2-llm-agent.md)
+Next: [**1.1 — Copilot Scope & Question Classes**](/part_2/01-question-classes.md)
