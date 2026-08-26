@@ -2,7 +2,7 @@
 
 *Test bullet: AdTech concepts like eCPM, fill rate, gross margin, or Prebid revenue are based on precise calculation formulas. How do you implement a semantic layer (e.g., dbt Semantic Layer, Cube, or dedicated BigQuery views) to ensure the LLM applies the correct calculation rules instead of reinventing its own SQL aggregations?*
 
-**Dedicated BigQuery views — the test's own third option.** Four of them: `v_opportunity_hourly`, `v_opportunity_daily`, `v_ssp_hourly`, `v_ssp_daily`. Every ratio is computed at read time from summed measures, and no ratio is ever stored. **The layer removes the opportunity to get the arithmetic wrong, not the temptation.** dbt's Semantic Layer and Cube lose the same way: a service to operate, where a view is an object BigQuery already resolves.
+**Dedicated BigQuery views — the test's own third option.** Four of them: `v_opportunity_hourly`, `v_opportunity_daily`, `v_ssp_hourly`, `v_ssp_daily`. **Every ratio is computed at read time from summed measures and none is stored, so there is no metric column for a model to recompute or average.** dbt's Semantic Layer and Cube lose the same way: a service to operate, where a view is an object BigQuery already resolves.
 
 ---
 
@@ -14,7 +14,7 @@ Gold has one row per hour × publisher × ad unit × format × device × channel
 SELECT AVG(ecpm) FROM gold_opportunity WHERE publisher_id = 'X'
 ```
 
-Wrong, and it looks completely fine. It averages thousands of rows of wildly different sizes — a row with 10 impressions weighs exactly as much as one with 10 million. The correct form is `SUM(gross_revenue) / SUM(impressions) * 1000`.
+Wrong, and nothing about the result looks wrong. It averages thousands of rows of wildly different sizes — a row with 10 impressions weighs exactly as much as one with 10 million. The correct form is `SUM(gross_revenue) / SUM(impressions) * 1000`.
 
 The view never exposes `ecpm` as a stored column, so there is nothing to average. The model can select the metric, filter it, group by it. It cannot recompute it: the division stays in the view, not in the model's SQL.
 
@@ -38,7 +38,7 @@ The view never exposes `ecpm` as a stored column, so there is nothing to average
 | `win_rate` | `wins / (bids + no_bids)` — how often being invited turns into a win |
 | `ecpm`, `gross_margin` | as above, over the impressions this SSP won |
 
-> **Someone raises floor prices and reports eCPM up 12%.** True, and meaningless: fill rate fell by more, and revenue per opportunity went down. An optimization judged on eCPM alone is judged on a number the change itself manufactured. `rpm` is one line of SQL and it closes the entire category.
+> **Someone raises floor prices and reports eCPM up 12%.** True, and meaningless: fill rate fell by more, and revenue per opportunity went down. An optimization judged on eCPM alone is judged on a number the change itself manufactured. `rpm` — revenue per opportunity — is in the view for that reason.
 
 **Cost.** A logical view stores nothing and costs nothing to maintain; what a question pays for is the scan of Gold underneath it, two to three orders of magnitude below the event layers and priced per layer in 3.1. The alternative that costs money is recomputing metrics from the event grain, not a different semantic layer.
 

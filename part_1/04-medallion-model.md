@@ -16,8 +16,6 @@
 
 ## Silver — types, deduplicates, anonymises
 
-> **Type wide, aggregate narrow.**
-
 | Column | Type | Null? | Note |
 |---|---|---|---|
 | `event_id` | STRING | no | Dedup key. Envelope |
@@ -66,7 +64,7 @@ The obvious design is one fact table at SSP grain. It cannot hold `auctions`, th
 
 ## The anonymisation boundary is Silver
 
-**Raw is transient; the irreplaceable copy is the first layer *allowed* to persist.** The instinct runs the other way: raw as the irreplaceable copy, kept longest. Aggregation is named as the anonymising step, so the *deletable*/*durable* line is a pipeline layer, not a policy document.
+**Raw is transient, so the irreplaceable copy is the first layer *allowed* to persist.** The usual arrangement is the reverse, with raw kept longest as the irreplaceable copy. Here aggregation is the named anonymising step, so the *deletable*/*durable* line falls on a pipeline layer rather than in a policy document.
 
 Silver is the source of truth, anonymous and retained indefinitely; Bronze is a landing and replay buffer whose window we do not control. **Silver is the layer that has to be durable** because Gold fixes the analysable dimension combinations at design time: ask it for *fill rate by device on one ad unit during a specific incident* and the rows were already collapsed. Silver's are fixed at query time.
 
@@ -74,9 +72,9 @@ Bronze is too early: stripping fields there means parsing the payload at ingest,
 
 > An SSP starts sending a new user-level identifier in its payload. It lands in Bronze, where everything lands, and it is gone at day 7. It never reaches Silver, because nobody added it to the allowlist — nobody had to notice it, classify it, or update a filter. **An allowlist's worst case is losing a field we wanted. A denylist's worst case is keeping one we were obliged to delete.**
 
-`auction_id` looks like the case that breaks this. It stays in Silver: the events of one auction cannot be tied together without it. Pseudonymous is not anonymous while a re-linking key exists — but the re-linking key is Bronze, and Bronze expires. On day 8, `auction_id` is a string that groups one auction's rows and joins to nothing. **It does not need to be removed; it needs to stop meaning anything, and the retention rule does that on a schedule.** The quality job asserts that the distinct-`auction_id` count tracks the auction count — a value repeating across auctions would make it a session key, the one way this argument fails.
+`auction_id` looks like the case that breaks this. It stays in Silver: the events of one auction cannot be tied together without it. Pseudonymous is not anonymous while a re-linking key exists — but the re-linking key is Bronze, and Bronze expires. On day 8, `auction_id` is a string that groups one auction's rows and joins to nothing, so the retention rule removes its meaning without anything having to remove the column. The quality job asserts that the distinct-`auction_id` count tracks the auction count — a value repeating across auctions would make it a session key, the one way this argument fails.
 
-**The honest cost: a field nobody typed is unrecoverable after a week.** With an indefinite raw archive, recovering it would be a query. Here it is unrecoverable. That is the strongest attack available on this design.
+**The cost: a field nobody typed is unrecoverable after a week.** With an indefinite raw archive, recovering it would be a query.
 
 ## Rejected — one line each
 
