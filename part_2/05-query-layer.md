@@ -2,37 +2,17 @@
 
 *Test bullet: on which BigQuery layer (Bronze, Silver, or Gold) should the LLM agent execute its generated SQL queries? Why?*
 
-**Gold.** It is the only layer where a question has an answer, a definition, and a published verdict on whether that answer is trustworthy.
+**Gold, through its views only — and what makes that the answer is an IAM grant, not a guardrail.** Gold is the only layer where a question has an answer, a definition, and a published verdict on whether that answer is trustworthy. The service account holds `dataViewer` on the semantic dataset alone, and authorized datasets let the views read Gold while the caller cannot. That grant bounds the normal question; a ceiling only bounds the bad one.
 
-**And not Gold's base tables — the views over them, in their own dataset.** The three-way choice the bullet offers is one level too coarse: `gold_opportunity` and `gold_ssp` are correct tables that a model still composes wrong queries against, for reasons that have nothing to do with which layer they sit in.
-
-## The other two layers
-
-**Bronze** is a typed envelope around an opaque JSON payload, and no metric is defined anywhere in it, so every question requires the model to invent the JSON extraction *and* the arithmetic on top of it. It also expires at 7 days, so most questions have no answer there at all.
-
-**Silver** is typed, deduplicated, anonymous and correct — and the wrong answer for exactly the reason people expect it to be the right one. It is one row per event with no metric definitions, which is precisely the surface an LLM composes wrong queries against. And nothing in Silver expires: Bronze's worst-case scan is capped by a 7-day window, Silver's is capped by nothing and is larger every day.
-
-## Gold's base tables are still the wrong grant
-
-`gold_opportunity` and `gold_ssp` carry different denominators under the same metric names. `gold_opportunity`'s denominator is every auction — *what share of our inventory sold*. `gold_ssp`'s is that SSP's own bids plus no-bids — *of the auctions SSP X was invited to, how often did it respond and how often did it win*. Both tables carry `impressions` and `wins`. A model handed both computes an SSP's fill rate against every auction. The number it returns is arithmetically clean, about a different question than the one asked, and carries nothing in the result set saying which denominator produced it.
-
-And the ratios are deliberately not stored (2.1), so a model on the base tables has to recompute every ratio it uses.
-
-So the grant is on the semantic dataset, which contains only views: the only objects the service account can name are views, and every one of them defines its own arithmetic.
+---
 
 ## The mechanism: authorized datasets
-
-Querying a view normally requires `roles/bigquery.dataViewer` on the view *and on every table it reads*. So granting the semantic dataset without granting Gold fails by default. The obvious fix is to grant Gold as well, which undoes the entire point.
 
 BigQuery's authorized datasets close it. The semantic dataset is authorized on the Gold dataset, so the views can read the base tables while the caller cannot — per Google's documentation, *"to query a view in an authorized dataset, a user needs to have access to the view, but access to the shared dataset is not required."* The authorization names the dataset, not its views: a view added tomorrow needs no grant of its own.
 
 **The grant in full, because it is checkable:** `roles/bigquery.jobUser` on the project — a query job needs `bigquery.jobs.create` wherever the data lives — and `roles/bigquery.dataViewer` on the semantic dataset alone. **No grant on Bronze, Silver or the Gold base tables exists anywhere for this service account.**
 
-The pipeline's quality verdict is published as a view in the same dataset, so `check_quality` reads it under that single grant.
-
 ## The same question, priced at three layers
-
-The bullet sits under security *and* cost. On-demand at $6.25/TiB:
 
 | Executed against | What one publisher-slice question scans | Order |
 |---|---|---|

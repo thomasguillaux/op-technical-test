@@ -17,10 +17,10 @@ Requirements only, never mechanisms. A line belongs here only if it stays true u
 | **Users**             | \~10 people, all seeing all publishers — **no entitlement scoping, so no row-level security to design.**                                | Given                                                               |
 | **Rhythm**            | Two rhythms, not two resolutions of one need. *Look at yesterday, act today* is trend work. *Ship, then watch* is episodic: nobody stares at an hourly chart, but on a deploy day the closed hour is read within minutes.                                         | Derived                                                               |
 
-**The retention answer is the one that reaches furthest.** Raw data is transient, so the durable record is the anonymised event layer — and the error budget moved from *we can always rebuild* to *we must be right inside 7 days, and know it*. That is [the first page of Part 1](/part_1/00-retention-anonymisation.md).
+**The retention answer is the one that reaches furthest.** Raw data is transient, so the durable record is the anonymised event layer — and the error budget moved from *we can always rebuild* to *we must be right inside 7 days, and know it*. That is [the anonymisation boundary in 2.1](/part_1/04-medallion-model.md).
 
 **The two timing bounds still come from a conversation, not a measurement.** Every window in the design derives from that 1-hour figure, so the pipeline measures it, per hour and per publisher. The answer to *"what if lateness is worse than you assumed?"* is **"we would know, and here is the metric."**
 
 ---
 
-Next: [**Part 1 — High-Volume Data Pipeline (GCP)**](/part1-pipeline.md)
+Next: [**1.1 — Architecture Diagram**](/part_1/01-architecture-diagram.md)
