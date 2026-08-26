@@ -88,7 +88,7 @@ The model receives a structured result: quality verdict, baseline used, headline
 | **Recursive drill-down** | Unbounded runtime and cost, for slices the materiality floor discards anyway |
 | **A significance test per segment** | 2B events/day makes almost everything significant; materiality is what matters |
 | **A separate hourly routine** | Identical arithmetic at both grains — two copies, one drift |
-| **Conversational Analytics API** | No documented mechanism forces a *why* to the fixed routine, and the same agent is documented as not supporting correlation questions — the test's own example |
+| **Conversational Analytics API** | No documented mechanism forces a *why* to the fixed routine, and its own Known limitations list correlation and anomaly detection as unsupported |
 
 ---
 
