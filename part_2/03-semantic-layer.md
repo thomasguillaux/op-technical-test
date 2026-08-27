@@ -14,7 +14,11 @@ Gold has one row per hour × publisher × ad unit × format × device × channel
 SELECT AVG(ecpm) FROM gold_opportunity WHERE publisher_id = 'X'
 ```
 
-Wrong, and nothing about the result looks wrong. It averages thousands of rows of wildly different sizes — a row with 10 impressions weighs exactly as much as one with 10 million. The correct form is `SUM(gross_revenue) / SUM(impressions) * 1000`.
+Wrong, and nothing about the result looks wrong. It averages thousands of rows of wildly different sizes — a row with 10 impressions weighs exactly as much as one with 10 million. The correct form:
+
+```sql
+SELECT SUM(gross_revenue) / SUM(impressions) * 1000 FROM gold_opportunity WHERE publisher_id = 'X'
+```
 
 The view never exposes `ecpm` as a stored column, so there is nothing to average. The model can select the metric, filter it, group by it. It cannot recompute it: the division stays in the view, not in the model's SQL.
 
