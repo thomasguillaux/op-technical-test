@@ -8,76 +8,151 @@
   <style>
     /* ---------- palette ---------- */
     :root {
-      --page-bg:     #ffffff;
-      --page-fg:     #34495e;
-      --heading-fg:  #2c3e50;
-      --sidebar-bg:  #ffffff;
-      --sidebar-fg:  #505d6b;
-      --border:      #e3e8ee;
-      --table-alt:   #f8fafc;
-      --inline-bg:   #f2f4f7;
-      --inline-fg:   #2e8b57;
-      --accent:      #2e8b57;
-      --code-bg:     #f6f8fa;
-      --code-fg:     #3b4754;
-      --code-border: #e1e7ee;
-      --tok-keyword: #a626a4;
-      --tok-func:    #0184bc;
-      --tok-string:  #3f8a3f;
-      --tok-number:  #b26100;
-      --tok-punct:   #7c8794;
-      --tok-comment: #9aa5b1;
-    }
-    html[data-theme="dark"] {
-      --page-bg:     #1b2027;
-      --page-fg:     #c7d0da;
-      --heading-fg:  #e8eef5;
-      --sidebar-bg:  #171b21;
-      --sidebar-fg:  #a7b2be;
-      --border:      #2c333c;
-      --table-alt:   #20262e;
-      --inline-bg:   #262d36;
-      --inline-fg:   #2e8b57;
-      --code-bg:     #232a33;
-      --code-fg:     #dbe3ec;
-      --code-border: #2f3742;
-      --tok-keyword: #e39ddb;
-      --tok-func:    #79c0ff;
-      --tok-string:  #a5d6a7;
-      --tok-number:  #ffb86c;
-      --tok-punct:   #9fb0c0;
-      --tok-comment: #7d8895;
+      /* brand */
+      --brand-navy:   #090056;
+      --brand-violet: #8a49f7;
+      --brand-mint:   #40deb9;
+
+      --theme-color:  #6d28d9;
+      --accent:       #6d28d9;
+
+      --page-bg:      #ffffff;
+      --page-fg:      #3a3a55;
+      --heading-fg:   #090056;
+
+      --sidebar-bg:      #090056;
+      --sidebar-fg:      #c9c5e8;
+      --sidebar-group:   #8b84c9;
+      --sidebar-sub:     #a09ad6;
+      --sidebar-hover:   #ffffff;
+      --sidebar-active:  #40deb9;
+      --sidebar-border:  #1c1470;
+
+      --border:       #e4e2f2;
+      --table-head:   #f4f2fd;
+      --table-alt:    #faf9ff;
+      --inline-bg:    #f1eefe;
+      --inline-fg:    #6d28d9;
+
+      --quote-bg:     #f3fcf9;
+      --quote-border: #40deb9;
+
+      --code-bg:      #fbfaff;
+      --code-fg:      #2e2e45;
+      --code-border:  #e4e2f2;
+      --tok-keyword:  #7c3aed;
+      --tok-func:     #0b5fce;
+      --tok-string:   #0f8f76;
+      --tok-number:   #b45309;
+      --tok-punct:    #6b6b85;
+      --tok-comment:  #8e8ca8;
     }
 
     /* ---------- page ---------- */
-    body, .sidebar, .content { background: var(--page-bg); }
-    .sidebar { background: var(--sidebar-bg); border-right: 1px solid var(--border); }
-    .sidebar ul li a { color: var(--sidebar-fg); }
-    .sidebar ul li.active > a { color: var(--accent); }
-    .sidebar-toggle { background-color: transparent; }
-    .app-name-link { color: var(--heading-fg) !important; }
+    body, .content { background: var(--page-bg); }
     .markdown-section { color: var(--page-fg); }
     .markdown-section h1,
     .markdown-section h2,
     .markdown-section h3,
     .markdown-section h4,
     .markdown-section strong { color: var(--heading-fg); }
-    .markdown-section blockquote { color: var(--page-fg); border-left-color: var(--border); }
+    .markdown-section h1 {
+      padding-bottom: .4em;
+      border-bottom: 3px solid var(--brand-mint);
+    }
+    .markdown-section h2 { color: var(--brand-navy); }
+    .markdown-section a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(109, 40, 217, .28);
+    }
+    .markdown-section a:hover {
+      color: var(--brand-violet);
+      border-bottom-color: var(--brand-violet);
+    }
+    /* heading permalinks are anchors — keep them out of the link styling */
+    .markdown-section a.anchor { border-bottom: none; font-weight: inherit; color: inherit; }
+    .markdown-section a.anchor span { color: inherit; }
+    .markdown-section blockquote {
+      color: var(--page-fg);
+      background: var(--quote-bg);
+      border-left: 4px solid var(--quote-border);
+      border-radius: 0 6px 6px 0;
+      padding: .9em 1.2em;
+      margin: 1.4em 0;
+    }
+    .markdown-section blockquote p { font-weight: 400; }
+    .markdown-section table { border-collapse: collapse; }
+    .markdown-section th {
+      background: var(--table-head);
+      color: var(--heading-fg);
+      font-weight: 600;
+    }
     .markdown-section tr { border-top-color: var(--border); background: var(--page-bg); }
     .markdown-section tr:nth-child(2n) { background: var(--table-alt); }
     .markdown-section th, .markdown-section td { border-color: var(--border); }
     .markdown-section hr { border-color: var(--border); }
 
+    /* ---------- sidebar ---------- */
+    .sidebar {
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--sidebar-border);
+    }
+    .sidebar > h1 { margin: 1.4rem 0 1rem; }
+    .sidebar > h1 .app-name-link { color: #ffffff !important; font-weight: 700; }
+    .sidebar ul li a {
+      color: var(--sidebar-fg);
+      border-bottom: none;
+      transition: color .15s ease;
+    }
+    .sidebar ul li a:hover { color: var(--sidebar-hover); text-decoration: none; }
+    .sidebar ul li.active > a {
+      color: var(--sidebar-active);
+      border-right: 2px solid var(--sidebar-active);
+      font-weight: 600;
+    }
+    /* group headings carry a nested list; leaf items are links */
+    .sidebar .sidebar-nav li { color: var(--sidebar-sub); font-weight: 600; }
+    .sidebar .sidebar-nav > ul > li:has(> ul) {
+      color: var(--sidebar-group);
+      font-size: 12px;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      margin-top: 1.4em;
+    }
+    .sidebar .sidebar-nav > ul > li:has(> ul) > ul {
+      font-size: 15px;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+    .sidebar ul li a { text-transform: none; letter-spacing: 0; font-weight: 400; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--sidebar-border); }
+    .sidebar-toggle { background-color: transparent; }
+    .sidebar-toggle .sidebar-toggle-button span { background-color: var(--brand-navy); }
+
     /* ---------- code ---------- */
     .markdown-section code:not([class*="lang-"]) {
       background: var(--inline-bg);
       color: var(--inline-fg);
+      border-radius: 4px;
+    }
+    .markdown-section pre {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 6px;
+      padding: .2em 1.3em;
+      overflow-x: auto;
+    }
+    .markdown-section pre > code {
+      background: transparent;
+      color: var(--code-fg);
+      padding: 1.1em 0;
     }
     .markdown-section pre[data-lang] {
       background: var(--code-bg);
       border: 1px solid var(--code-border);
       border-radius: 6px;
-      padding: 1.1em 1.3em;
+      padding: .2em 1.3em;
       overflow-x: auto;
     }
     .markdown-section pre[data-lang]::after {
@@ -111,14 +186,6 @@
     .markdown-section pre[data-lang] .token.punctuation { color: var(--tok-punct); background: transparent; }
     .markdown-section pre[data-lang] .token.comment  { color: var(--tok-comment); font-style: italic; }
 
-    /* ---------- mermaid ---------- */
-    .markdown-section .mermaid {
-      margin: 1.6em 0;
-      text-align: center;
-      overflow-x: auto;
-    }
-    .markdown-section .mermaid svg { max-width: 100%; height: auto; }
-
     /* ---------- GCP component icons, part 1.2 ---------- */
     .markdown-section h2[id="cloud-storage-standard-class-not-archive"]::before,
     .markdown-section h2[id="dataflow-beam-rejected"]::before,
@@ -135,104 +202,11 @@
     .markdown-section h2[id="cloud-storage-standard-class-not-archive"]::before       { background-image: url("assets/icons/storage.png"); }
     .markdown-section h2[id="dataflow-beam-rejected"]::before                         { background-image: url("assets/icons/dataflow.png"); }
     .markdown-section h2[id="airflow-composer-rejected-dataform-instead"]::before     { background-image: url("assets/icons/composer.png"); }
-
-    /* ---------- search ---------- */
-    .sidebar .search { border-bottom: 1px solid var(--border); }
-    .sidebar .search input { background: var(--sidebar-bg); color: var(--sidebar-fg); border-color: var(--border); }
-    .sidebar .search .results-panel { color: var(--page-fg); }
-    .sidebar .search h2 { color: var(--heading-fg); }
-    .sidebar .search a { color: var(--sidebar-fg); }
-    .sidebar .search .matching-post p { color: var(--sidebar-fg); }
-    .sidebar .search .clear-button { color: var(--sidebar-fg); }
-
-    /* ---------- theme switch ---------- */
-    #theme-switch {
-      position: fixed;
-      top: 14px;
-      right: 18px;
-      z-index: 30;
-      width: 34px;
-      height: 34px;
-      border: 1px solid var(--border);
-      border-radius: 50%;
-      background: var(--page-bg);
-      color: var(--page-fg);
-      font-size: 15px;
-      line-height: 1;
-      cursor: pointer;
-    }
-    #theme-switch:hover { border-color: #42b983; color: #42b983; }
-    @media print { #theme-switch { display: none; } }
   </style>
 </head>
 <body>
-  <button id="theme-switch" type="button" title="Light / dark" aria-label="Toggle light or dark theme">☾</button>
   <div id="app"></div>
   <script>
-    (function () {
-      var saved;
-      try { saved = localStorage.getItem('theme'); } catch (e) { saved = null; }
-      var dark = saved
-        ? saved === 'dark'
-        : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-      function apply(isDark) {
-        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-        var btn = document.getElementById('theme-switch');
-        if (btn) btn.textContent = isDark ? '☀' : '☾';
-      }
-      apply(dark);
-
-      document.addEventListener('DOMContentLoaded', function () {
-        apply(document.documentElement.getAttribute('data-theme') === 'dark');
-        document.getElementById('theme-switch').addEventListener('click', function () {
-          dark = document.documentElement.getAttribute('data-theme') !== 'dark';
-          apply(dark);
-          try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
-          renderMermaid();
-        });
-      });
-    })();
-
-    /* ---------- mermaid: render from source, re-render on theme change ---------- */
-    function renderMermaid() {
-      var nodes = document.querySelectorAll('.markdown-section .mermaid');
-      if (!nodes.length || !window.mermaid) return;
-
-      var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-      var css = getComputedStyle(document.documentElement);
-      var v = function (n) { return css.getPropertyValue(n).trim(); };
-
-      window.mermaid.initialize({
-        startOnLoad: false,
-        securityLevel: 'strict',
-        theme: 'base',
-        fontFamily: 'inherit',
-        themeVariables: {
-          background:           v('--page-bg'),
-          primaryColor:         v('--inline-bg'),
-          primaryTextColor:     v('--page-fg'),
-          primaryBorderColor:   dark ? '#3b4552' : '#cbd5e1',
-          secondaryColor:       v('--table-alt'),
-          tertiaryColor:        v('--table-alt'),
-          lineColor:            v('--tok-punct'),
-          textColor:            v('--page-fg'),
-          mainBkg:              v('--inline-bg'),
-          nodeBorder:           dark ? '#3b4552' : '#cbd5e1',
-          clusterBkg:           v('--table-alt'),
-          clusterBorder:        v('--border'),
-          edgeLabelBackground:  v('--page-bg'),
-          titleColor:           v('--heading-fg')
-        }
-      });
-
-      nodes.forEach(function (n) {
-        n.removeAttribute('data-processed');
-        n.innerHTML = decodeURIComponent(n.getAttribute('data-graph'));
-      });
-      window.mermaid.run({ nodes: nodes });
-    }
-
     window.$docsify = {
       name: 'Technical Test',
       loadSidebar: true,
@@ -240,32 +214,10 @@
       auto2top: true,
       alias: {
         '/.*/_sidebar.md': '/_sidebar.md'
-      },
-      markdown: {
-        renderer: {
-          code: function (code, lang) {
-            if (lang === 'mermaid') {
-              return '<div class="mermaid" data-graph="' + encodeURIComponent(code) + '"></div>';
-            }
-            return this.origin.code.apply(this, arguments);
-          }
-        }
-      },
-      search: {
-        depth: 3,
-        noData: 'No results.',
-        placeholder: 'Search'
-      },
-      plugins: [
-        function (hook) {
-          hook.doneEach(function () { renderMermaid(); });
-        }
-      ]
+      }
     }
   </script>
-  <script src="//cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/docsify/lib/docsify.min.js"></script>
-  <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/search.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js"></script>
 </body>

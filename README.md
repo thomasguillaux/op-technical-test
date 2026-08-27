@@ -21,8 +21,7 @@ introduction.md               the eight arguments the design rests on
 intro/                        methodology + business assumptions (given, not derived)
 part_1/  01 … 06              ingestion → BigQuery medallion model, one page per test bullet
 part_2/  01 … 06              copilot over the Part 1 Gold layer, one page per test bullet
-CONTEXT.md                    domain vocabulary
 diagrams_src/ → assets/       diagram sources (rendered with .venv/bin/python diagrams_src/<file>.py)
 ```
 
-`_sidebar.md` drives navigation. There is no routing layer: every page opens with its own claim and carries its own argument, so a page reached from search stands alone.
+`_sidebar.md` drives navigation. There is no routing layer: every page opens with its own claim and carries its own argument, so any page stands alone.

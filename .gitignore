@@ -2,3 +2,5 @@ local_docs/
 .venv/
 __pycache__/
 .claude/
+CLAUDE.md
+CONTEXT.md
