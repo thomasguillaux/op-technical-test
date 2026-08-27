@@ -67,6 +67,12 @@ with Diagram(
 
     resolve = PredefinedProcess("resolve_entity\nlive dimension values,\nnot a vector index")
 
+    # The fourth tool. It reads a verdict the pipeline published rather than asking the model
+    # to judge its own input, which is why it is a tool call and not a paragraph of prompt.
+    check = PredefinedProcess(
+        "check_quality(grain, period)\nthe pipeline's verdict,\nnot the model's judgement"
+    )
+
     # Layers 1 and 2 parse model-written SQL, so they are run_query-only. The ceiling is not:
     # a routine we wrote still runs over a period the model chose. Every path converges here,
     # which is also what makes the denial below identity-wide rather than run_query's alone.
@@ -90,15 +96,17 @@ with Diagram(
     v1 >> v2 >> v3
     model >> Edge(label="why — a cause") >> diagnose
     model >> Edge(label='"site Y"', style="dotted") >> resolve
+    model >> Edge(label='"is it settled?"', style="dotted") >> check
 
-    # Both tool paths converge on the ceiling, so the picture shows what the prose claims:
+    # Every tool path converges on the ceiling, so the picture shows what the prose claims:
     # one execution seam, one grant, and the same views underneath either kind of SQL.
     diagnose >> v3
     resolve >> Edge(style="dotted") >> v3
+    check >> Edge(style="dotted") >> v3
 
     v3 >> v_opp
     v3 >> v_ssp
-    v3 >> Edge(label="is the period settled?", style="dotted") >> quality
+    v3 >> Edge(style="dotted") >> quality
 
     v3 >> DENIED >> raw
 
