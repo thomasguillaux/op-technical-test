@@ -22,11 +22,7 @@
 | Data older than 3 days, or a backdated revenue share | Targeted rebuild         | The same model, pointed at named past days. *Detected, not noticed:* an alert fires when Silver writes outside Gold's trailing window |
 | Bronze itself is wrong, or a partition dropped       | Replay from GCS          | A BigLake external table over the archive prefix, `INSERT … SELECT` into Bronze; one `UPDATE` puts the watermark back behind the replayed rows, and everything downstream then reruns unchanged |
 
-## Why not lambda
-
-An hourly figure cannot exist before the hour it summarises has ended. A speed layer delivering an event in four seconds and a batch tier delivering it in ten minutes produce the same figure at the same moment.
-
-**Cost.** The separation buys no component. Both paths are priced where their components are, in bullets 1.2, 2.1 and 2.2. The priced item is what it avoids: a speed layer means a streaming runtime on the full firehose, low thousands per month.
+**Cost.** This decision adds no component, so it adds no line — both paths are priced where their components are, in bullets 1.2, 2.1 and 2.2. The money it moves is money avoided: a speed layer means a streaming runtime on the full firehose, low thousands per month.
 
 ## Rejected — one line each
 
