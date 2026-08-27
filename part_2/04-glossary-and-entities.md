@@ -11,6 +11,8 @@
 | *"site Y"* — an **entity** | Hundreds of publishers, far more ad units | Changes as business is won and lost | **Queried live** — the `resolve_entity` tool |
 | *"make us"* — a **term** | A few dozen definitions | Changes only when the business changes a definition | **Injected whole** — no retrieval at all |
 
+The tool scores the spoken name against the publisher names actually present in the last 30 days and returns the five closest — edit distance catches typos and truncations, `SOUNDEX` catches a name heard rather than read. It hands back candidates, never a guess: the model picks one or asks.
+
 `resolve_entity`, in full:
 
 ```sql
