@@ -2,7 +2,7 @@
 
 ## Requirements are the input; components are the output
 
-Each decision starts from a requirement, takes the smallest component that satisfies it, then tries to delete that component. Components named in the test are not assumed: drawing the boxes the test lists and connecting them would produce an architecture in which no component ever had to justify itself.
+Each decision starts from a requirement and takes the smallest component that satisfies it. The question each component has to survive is *could we meet every requirement without it* — if we could, it does not go in. It is asked before anything is wired together, because a component already in place always looks load-bearing. Components named in the test are not assumed: drawing the boxes the test lists and connecting them would produce an architecture in which no component ever had to justify itself.
 
 That is why most sections end with a **Rejected** table. Where a component named in the test is absent, the table gives the reason it lost *and* the condition that brings it back — the condition is the load-bearing half, because "no Dataflow" is a claim about this volume and this latency, not about Dataflow.
 

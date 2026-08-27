@@ -10,7 +10,7 @@ Everything else on these pages is detail, cost, or a rejected alternative.
 
 ### Part 1 — the pipeline
 
-**1. No component sits between us and something we could call directly.** One sentence removes Dataflow, Composer and dbt Core here, and Cube, LangChain and a vector database in Part 2 — one rule applied six times rather than six independent verdicts. Argued in [1.2](/part_1/02-component-justification.md).
+**1. We do not run a service to make a call we could already make.** One sentence removes Dataflow, Composer and dbt Core here, and Cube, LangChain and a vector database in Part 2 — one rule applied six times rather than six independent verdicts. Argued in [1.2](/part_1/02-component-justification.md).
 
 **2. The hot path can fail but cannot be wrong.** That is where the hot/cold line goes — at Bronze. Receive, check the envelope, buffer durably, land. Every judgement that could be wrong happens downstream, where being wrong costs a rerun instead of a redeploy. Argued in [1.3](/part_1/03-hot-cold-separation.md).
 

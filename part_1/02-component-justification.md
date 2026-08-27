@@ -2,7 +2,7 @@
 
 *Test bullet: justify the use of the chosen components (Pub/Sub, Dataflow/Beam, Cloud Storage, BigQuery, Airflow/Composer).*
 
-**Three of the five named components are kept and two are rejected, on one sentence: no component sits between us and something we could call directly.** Pub/Sub, Cloud Storage and BigQuery each do work nothing else does. Dataflow would move five values from inside a JSON object to beside it; Composer would schedule a DAG with one system in it. Each rejection carries the condition that reinstates it. **Choosing components also fixes how many copies of the raw record exist**, so the four the 7-day rule binds are counted below.
+**Three of the five named components are kept and two are rejected, on one sentence: we do not run a service to make a call we could already make.** Pub/Sub, Cloud Storage and BigQuery each do work nothing else does. Dataflow would move five values from inside a JSON object to beside it; Composer would schedule a DAG with one system in it. Each rejection carries the condition that reinstates it. **Choosing components also fixes how many copies of the raw record exist**, so the four the 7-day rule binds are counted below.
 
 ---
 
