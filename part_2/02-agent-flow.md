@@ -22,6 +22,12 @@
 | 8 | Result → model | `Part.from_function_response(...)` appended to `contents`; the loop returns to hop 3 | ms |
 | 9 | Narration → FastAPI → analyst | Four fields on the same `POST`: the prose, the executed SQL, the rows, and the period's quality verdict | ~1–2 s |
 
+**The same nine hops, in the order they fire.** The table gives the mechanism per hop; what it cannot show is that hop 3 recurs. One question is four calls to Gemini and three to BigQuery, and the loop only ends because our code stops forcing a tool call.
+
+![One question, turn by turn — four calls to Gemini, three to BigQuery, and the routing flip that ends the loop](../assets/agent-sequence.svg)
+
+**`ANY` has no exit of its own.** Under `mode=ANY` the model must emit a function call, so it can never answer; the orchestrator flips the mode to `NONE` once a tool has produced the numbers, and that turn is the only one that returns prose. The exit is a decision our code makes on the state of `contents`, not one the model is trusted to make — and it is what stops the model following the routine's attribution with free SQL of its own.
+
 **The objection is a dependency one.** We own the seam either way; one version of it adds a framework whose agent entry point moved packages inside a year. `AgentExecutor` now ships in a separate `langchain-classic` package. `create_agent` is the supported path. This is the argument that removed Dataflow, Composer and dbt Core in Part 1, and Cube and a vector database alongside LangChain in Part 2: *a service we run, to make a call we could already make.*
 
 **Cost.** BigQuery bytes dominate per question, not tokens, and the ceiling at hop 7 bounds the worst case, not the average. Context caching is not a lever: the minimum cacheable prefix for the Gemini 3 family is 4,096 tokens, below which the dictionary block sits.

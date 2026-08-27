@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 766" role="img" aria-label="One question through the copilot: the analyst posts to FastAPI, which calls Gemini four times and BigQuery three times — resolve_entity, check_quality and diagnose_change — then relaxes tool_config to NONE so the model writes prose.">
+<defs>
+<marker id="ah-model" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#6d28d9"/></marker>
+<marker id="ah-ours" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#0f8f76"/></marker>
+<marker id="ah-back" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#6b6b85"/></marker>
+</defs>
+<rect width="1180" height="766" fill="#ffffff"/>
+<g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<rect x="55" y="22" width="150" height="38" rx="3" fill="#ffffff" stroke="#090056" stroke-width="1.3"/>
+<text x="130" y="47" text-anchor="middle" font-size="14" font-weight="600" fill="#090056">Analyst</text>
+<line x1="130" y1="60" x2="130" y2="750" stroke="#c9c5e8" stroke-width="1.2" stroke-dasharray="3 5"/>
+<rect x="325" y="22" width="150" height="38" rx="3" fill="#ffffff" stroke="#090056" stroke-width="1.3"/>
+<text x="400" y="47" text-anchor="middle" font-size="14" font-weight="600" fill="#090056">FastAPI</text>
+<line x1="400" y1="60" x2="400" y2="750" stroke="#c9c5e8" stroke-width="1.2" stroke-dasharray="3 5"/>
+<rect x="645" y="22" width="150" height="38" rx="3" fill="#ffffff" stroke="#090056" stroke-width="1.3"/>
+<text x="720" y="47" text-anchor="middle" font-size="14" font-weight="600" fill="#090056">Gemini</text>
+<line x1="720" y1="60" x2="720" y2="750" stroke="#c9c5e8" stroke-width="1.2" stroke-dasharray="3 5"/>
+<rect x="965" y="22" width="150" height="38" rx="3" fill="#ffffff" stroke="#090056" stroke-width="1.3"/>
+<text x="1040" y="47" text-anchor="middle" font-size="14" font-weight="600" fill="#090056">semantic views</text>
+<line x1="1040" y1="60" x2="1040" y2="750" stroke="#c9c5e8" stroke-width="1.2" stroke-dasharray="3 5"/>
+<line x1="130" y1="96" x2="394" y2="96" stroke="#6b6b85" stroke-width="1.4" marker-end="url(#ah-back)"/>
+<text x="262" y="87" text-anchor="middle" font-size="13" font-weight="400" fill="#6b6b85">POST /ask — one question</text>
+<line x1="400" y1="138" x2="714" y2="138" stroke="#0f8f76" stroke-width="1.4" marker-end="url(#ah-ours)"/>
+<text x="557" y="129" text-anchor="middle" font-size="13" font-weight="400" fill="#0f8f76">contents[1] + tools + tool_config ANY</text>
+<line x1="720" y1="180" x2="406" y2="180" stroke="#6d28d9" stroke-width="1.4" marker-end="url(#ah-model)"/>
+<text x="563" y="171" text-anchor="middle" font-size="13" font-weight="400" fill="#6d28d9">functionCall resolve_entity("Nortline")</text>
+<line x1="400" y1="222" x2="1034" y2="222" stroke="#0f8f76" stroke-width="1.4" marker-end="url(#ah-ours)"/>
+<text x="717" y="213" text-anchor="middle" font-size="13" font-weight="400" fill="#0f8f76">our SQL: EDIT_DISTANCE + SOUNDEX</text>
+<line x1="1040" y1="264" x2="406" y2="264" stroke="#6b6b85" stroke-width="1.4" marker-end="url(#ah-back)"/>
+<text x="723" y="255" text-anchor="middle" font-size="13" font-weight="400" fill="#6b6b85">1 candidate: northline</text>
+<line x1="400" y1="306" x2="714" y2="306" stroke="#0f8f76" stroke-width="1.4" marker-end="url(#ah-ours)"/>
+<text x="557" y="297" text-anchor="middle" font-size="13" font-weight="400" fill="#0f8f76">contents[3] — + functionResponse</text>
+<line x1="720" y1="348" x2="406" y2="348" stroke="#6d28d9" stroke-width="1.4" marker-end="url(#ah-model)"/>
+<text x="563" y="339" text-anchor="middle" font-size="13" font-weight="400" fill="#6d28d9">functionCall check_quality(day, 08-26)</text>
+<line x1="400" y1="390" x2="1034" y2="390" stroke="#0f8f76" stroke-width="1.4" marker-end="url(#ah-ours)"/>
+<text x="717" y="381" text-anchor="middle" font-size="13" font-weight="400" fill="#0f8f76">our SQL: v_quality_hour</text>
+<line x1="1040" y1="432" x2="406" y2="432" stroke="#6b6b85" stroke-width="1.4" marker-end="url(#ah-back)"/>
+<text x="723" y="423" text-anchor="middle" font-size="13" font-weight="400" fill="#6b6b85">24/24 hours settled</text>
+<line x1="400" y1="474" x2="714" y2="474" stroke="#0f8f76" stroke-width="1.4" marker-end="url(#ah-ours)"/>
+<text x="557" y="465" text-anchor="middle" font-size="13" font-weight="400" fill="#0f8f76">contents[5]</text>
+<line x1="720" y1="516" x2="406" y2="516" stroke="#6d28d9" stroke-width="1.4" marker-end="url(#ah-model)"/>
+<text x="563" y="507" text-anchor="middle" font-size="13" font-weight="400" fill="#6d28d9">functionCall diagnose_change(ecpm, …)</text>
+<line x1="400" y1="558" x2="1034" y2="558" stroke="#0f8f76" stroke-width="1.4" marker-end="url(#ah-ours)"/>
+<text x="717" y="549" text-anchor="middle" font-size="13" font-weight="400" fill="#0f8f76">our SQL × 4 — one per dimension</text>
+<line x1="1040" y1="600" x2="406" y2="600" stroke="#6b6b85" stroke-width="1.4" marker-end="url(#ah-back)"/>
+<text x="723" y="591" text-anchor="middle" font-size="13" font-weight="400" fill="#6b6b85">segments, rate and mix</text>
+<line x1="40" y1="616" x2="1140" y2="616" stroke="#c9c5e8" stroke-width="1" stroke-dasharray="2 6"/>
+<text x="1140" y="631" text-anchor="end" font-size="11" letter-spacing="1.2" fill="#6b6b85">EXIT — ROUTING RELAXED TO NONE</text>
+<line x1="400" y1="642" x2="714" y2="642" stroke="#0f8f76" stroke-width="1.4" marker-end="url(#ah-ours)"/>
+<text x="557" y="633" text-anchor="middle" font-size="13" font-weight="600" fill="#0f8f76">contents[7] + tool_config NONE</text>
+<line x1="720" y1="684" x2="406" y2="684" stroke="#6d28d9" stroke-width="1.4" marker-end="url(#ah-model)"/>
+<text x="563" y="675" text-anchor="middle" font-size="13" font-weight="400" fill="#6d28d9">prose — the only text part of the run</text>
+<line x1="400" y1="726" x2="136" y2="726" stroke="#6b6b85" stroke-width="1.4" marker-end="url(#ah-back)"/>
+<text x="268" y="717" text-anchor="middle" font-size="13" font-weight="400" fill="#6b6b85">answer + SQL + rows + verdict</text>
+</g></svg>
