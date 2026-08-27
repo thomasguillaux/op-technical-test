@@ -45,6 +45,8 @@ The client named two aggregations: hourly to watch a release land, daily to foll
 
 > `is_settled` — a Silver run has succeeded **whose watermark on `publish_time` has passed `auction_hour + 2h`**.
 
+An hour is publishable the moment it ends and provisional for the two after it, because late events are still landing. Without the flag an analyst cannot separate a partial hour from a real collapse, and the decision that number drives is real either way. The watermark rides `publish_time`, our own broker clock, rather than the publisher-stamped `auction_timestamp` a misconfigured wrapper can re-stamp. The Part 2 copilot gates on the same column before it answers.
+
 ### Two fact tables, because there are two denominators
 
 The obvious design is one fact table at SSP grain. It cannot hold `auctions`, the denominator of fill rate: an auction opens before any SSP is involved, so it has no single `ssp_id` — one auction with ten SSPs invited becomes ten rows, and `auctions` is counted ten times.
