@@ -92,6 +92,22 @@
     .markdown-section tr:nth-child(2n) { background: var(--table-alt); }
     .markdown-section th, .markdown-section td { border-color: var(--border); }
     .markdown-section hr { border-color: var(--border); }
+    .markdown-section details {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0 18px;
+      margin: 1.4em 0;
+      background: var(--page-bg);
+    }
+    .markdown-section details[open] { padding-bottom: 6px; }
+    .markdown-section details > summary {
+      cursor: pointer;
+      padding: 12px 0;
+      color: var(--brand-navy);
+      font-size: 15px;
+    }
+    .markdown-section details > summary + * { margin-top: 0; }
+    .markdown-section details h3 { font-size: 15px; margin-top: 1.4em; }
 
     /* ---------- sidebar ---------- */
     .sidebar {
@@ -220,5 +236,6 @@
   <script src="//cdn.jsdelivr.net/npm/docsify/lib/docsify.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
 </body>
 </html>
