@@ -41,12 +41,6 @@
 
 The client named two aggregations: hourly to watch a release land, daily to follow trends. **Hourly is stored; daily is a view over it.** An hour cannot be recovered from a day, and two independently built tables eventually disagree with nobody able to say which is right.
 
-### `is_settled` — published, not left to the reader
-
-> `is_settled` — a Silver run has succeeded **whose watermark on `publish_time` has passed `auction_hour + 2h`**.
-
-An hour is publishable the moment it ends and provisional for the two after it, because late events are still landing. Without the flag an analyst cannot separate a partial hour from a real collapse, and the decision that number drives is real either way. The watermark rides `publish_time`, our own broker clock, rather than the publisher-stamped `auction_timestamp` a misconfigured wrapper can re-stamp. The Part 2 copilot gates on the same column before it answers.
-
 ### Two fact tables, because there are two denominators
 
 The obvious design is one fact table at SSP grain. It cannot hold `auctions`, the denominator of fill rate: an auction opens before any SSP is involved, so it has no single `ssp_id` — one auction with ten SSPs invited becomes ten rows, and `auctions` is counted ten times.
@@ -57,6 +51,12 @@ The obvious design is one fact table at SSP grain. It cannot hold `auctions`, th
 | **`gold_ssp`** | `auction_hour, publisher_id, ad_unit_id, ssp_id, format, device, channel` | `bids`, `no_bids`, `wins`, `impressions`, `gross_revenue`, `publisher_payout` |
 
 > **An analyst asks why SSP 7's fill rate looks catastrophic.** It isn't. SSP 7 is invited to 4% of auctions, so measured against every opportunity it looks like it never delivers; measured against the auctions it was invited to, it performs fine. A single fact table keyed by SSP gives only the first number, and the decision that number drives is *"drop SSP 7"*.
+
+### `is_settled` — published, not left to the reader
+
+> `is_settled` — a Silver run has succeeded **whose watermark on `publish_time` has passed `auction_hour + 2h`**.
+
+An hour is publishable the moment it ends and provisional for the two after it, because late events are still landing. Without the flag an analyst cannot separate a partial hour from a real collapse, and the decision that number drives is real either way. The watermark rides `publish_time`, our own broker clock, rather than the publisher-stamped `auction_timestamp` a misconfigured wrapper can re-stamp. The Part 2 copilot gates on the same column before it answers.
 
 ### `quality_hour`, the third table
 
