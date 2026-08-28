@@ -2,7 +2,7 @@
 
 *Test bullet: propose a GCP architecture diagram, from raw event ingestion to availability for BI.*
 
-**Eight hops, and not one of them is a runtime we operate.** The path from raw event to BI is two native Pub/Sub export subscriptions and three Dataform models. The durable buffer sits at the topic, so every failure downstream of it is a rerun rather than a backfill — where a collector writing to BigQuery directly turns each of those same failures into producer-side data loss.
+**Eight hops, and not one of them is a runtime we operate — no version to pin, no capacity to size, no on-call.** The path from raw event to BI is two native Pub/Sub export subscriptions and three Dataform models. The durable buffer sits at the topic, so every failure downstream of it is a rerun rather than a backfill — where a collector writing to BigQuery directly turns each of those same failures into producer-side data loss.
 
 ---
 
